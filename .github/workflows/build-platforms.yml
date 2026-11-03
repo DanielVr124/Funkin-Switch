@@ -4,13 +4,37 @@ on:
   push:
     branches:
       - switch-port-dev
+    paths:
+      - 'source/**'
+      - 'project.hxp'
+      - 'hmm.json'
+      - '.gitmodules'
+      - 'assets/**'
+      - 'art/**'
+      - 'templates/**'
+      - '.github/actions/setup-haxe/**'
+      - '.github/workflows/build-platforms.yml'
   pull_request:
     branches:
       - switch-port-dev
+    paths:
+      - 'source/**'
+      - 'project.hxp'
+      - 'hmm.json'
+      - '.gitmodules'
+      - 'assets/**'
+      - 'art/**'
+      - 'templates/**'
+      - '.github/actions/setup-haxe/**'
+      - '.github/workflows/build-platforms.yml'
   workflow_dispatch:
 
 permissions:
   contents: read
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
 
 jobs:
   windows:
