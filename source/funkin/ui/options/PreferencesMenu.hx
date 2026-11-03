@@ -25,7 +25,7 @@ import funkin.util.TouchUtil;
 import funkin.util.SwipeUtil;
 #end
 import funkin.util.HapticUtil;
-import lime.ui.WindowVSyncMode;
+import funkin.util.WindowVSyncMode;
 
 class PreferencesMenu extends Page<OptionsState.OptionsMenuPageName>
 {
