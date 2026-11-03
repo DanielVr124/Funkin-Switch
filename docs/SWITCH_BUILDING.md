@@ -30,19 +30,21 @@ haxelib run lime rebuild windows
 haxelib run lime build windows -debug
 ```
 
-The repository's `.github/workflows/build-platforms.yml` runs both targets on the `switch-port-dev` branch. The Switch job uses the devkitPro `devkita64` container.
+The repository's `.github/workflows/build-platforms.yml` runs both targets on the `switch-port-dev` branch. The Switch job uses the devkitPro `devkita64` container. On a private repository, it also packages `Funkin.nro` and an SD-card ZIP containing `switch/Funkin-Switch/Funkin.nro`.
 
 ## Current Switch integration
 
 - Switch startup changes the working directory to `romfs:/` for packaged, read-only game assets.
 - Persistent save data is directed to `sdmc:/switch/Funkin-Switch/saves`.
+- User-installed mods are read from `sdmc:/switch/Funkin-Switch/mods`.
+- Crash reports and debug trace logs are written to `sdmc:/switch/Funkin-Switch/logs`.
 - Controller polling uses libnx `Pad` / HID APIs.
 - D-pad and face-button presses and releases are routed to the official precise rhythm input manager:
   - Y / D-pad Left: Left
   - B / D-pad Down: Down
   - X / D-pad Up: Up
   - A / D-pad Right: Right
-- Standard Lime/SDL gamepad handling remains in place for the rest of the UI. Menu focus, reconnection, and all controller layouts still require runtime verification.
+- Standard Lime/SDL gamepad handling remains in place for the rest of the UI. Native libnx polling is the single rhythm-lane input source to avoid double-dispatch. Menu focus, reconnection, and all controller layouts still require runtime verification.
 - Video playback is disabled on Switch for now because the current target setup does not include the desktop `hxvlc` backend. Windows keeps the existing video playback implementation.
 
 The Switch title ID in `project.hxp` is a development placeholder. A final package should use a unique title ID and a confirmed application icon.
