@@ -73,12 +73,18 @@ jobs:
         run: haxelib run lime build windows -v -release -DGITHUB_BUILD
         timeout-minutes: 120
 
+      - name: Package Windows desktop ZIP
+        shell: pwsh
+        run: |
+          New-Item -ItemType Directory -Force -Path dist | Out-Null
+          Compress-Archive -Path 'export/release/windows/bin/*' -DestinationPath 'dist/FridayNightFunkin-Windows.zip' -CompressionLevel Optimal
+
       - name: Upload Windows build (private repositories only)
         if: ${{ github.repository_visibility == 'private' }}
         uses: actions/upload-artifact@v4
         with:
           name: FridayNightFunkin-Windows-${{ github.sha }}
-          path: export/release/windows/bin/
+          path: dist/FridayNightFunkin-Windows.zip
           if-no-files-found: error
           retention-days: 14
 
@@ -127,12 +133,39 @@ jobs:
         run: haxelib run lime build switch -v -release -DGITHUB_BUILD
         timeout-minutes: 120
 
+      - name: Package Switch SD-card installation ZIP
+        run: |
+          set -euo pipefail
+          mkdir -p dist/sd-card/switch/Funkin-Switch/mods
+          cp export/switch/bin/Funkin.nro dist/sd-card/switch/Funkin-Switch/Funkin.nro
+          cat > dist/sd-card/README.txt <<'EOF'
+          Friday Night Funkin' - Nintendo Switch homebrew
+
+          Installation:
+          1. Extract this ZIP to the root of the SD card used by your homebrew-enabled Nintendo Switch.
+          2. Keep the folder structure intact.
+          3. Open the Homebrew Menu and launch Funkin.nro from the switch/Funkin-Switch folder.
+
+          Writable game data:
+          - Saves: switch/Funkin-Switch/saves
+          - Mods: switch/Funkin-Switch/mods
+          - Crash/debug logs: switch/Funkin-Switch/logs
+
+          This is an unofficial homebrew build. Do not redistribute the game or its bundled assets.
+          EOF
+          cat > dist/sd-card/switch/Funkin-Switch/mods/README.txt <<'EOF'
+          Place compatible Friday Night Funkin' V-Slice mods in this folder.
+          EOF
+          (cd dist/sd-card && zip -qr ../FridayNightFunkin-Switch-SDCard.zip .)
+
       - name: Upload Switch build (private repositories only)
         if: ${{ github.repository_visibility == 'private' }}
         uses: actions/upload-artifact@v4
         with:
           name: FridayNightFunkin-Switch-${{ github.sha }}
-          path: export/release/switch/bin/
+          path: |
+            export/switch/bin/Funkin.nro
+            dist/FridayNightFunkin-Switch-SDCard.zip
           if-no-files-found: error
           retention-days: 14
 
