@@ -13,6 +13,7 @@
 - Kept the standard Windows target in the project configuration.
 - Added Switch startup selection in `source/Main.hx`; Windows still creates the normal `FlxGame`.
 - Added native HID polling and a precise rhythm-input bridge for D-pad and Y/B/X/A button press/release transitions.
+- On Switch, precise rhythm input uses libnx exclusively to avoid SDL/libnx double-dispatch; SDL remains enabled for general menu navigation and sticks.
 - Configured persistent saves under the Switch SD card's `switch/Funkin-Switch/saves` directory.
 - Redirected crash reports and debug trace logs to `sdmc:/switch/Funkin-Switch/logs`; Switch directory creation now builds missing parent folders on a fresh SD card.
 - Added a CI workflow with separate Windows and Switch build jobs.
