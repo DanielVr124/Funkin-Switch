@@ -1609,10 +1609,18 @@ class Project extends HXProject
 
     if (isAndroid())
     {
-      // Adaptive icons
-      // Older Lime-NX HXProject APIs do not declare adaptiveIcon; keep this
-      // optional Android field dynamic so newer desktop/mobile Lime builds retain it.
-      Reflect.setField(this, "adaptiveIcon", new AdaptiveIcon('art/icons/android/', true));
+      // AdaptiveIcon is not present in the pinned Lime-NX toolchain. Resolve it
+      // dynamically so toolchains that provide it can still use the adaptive
+      // Android icon, while older toolchains fall back to the standard icon.
+      var adaptiveIconType:Null<Class<Dynamic>> = Type.resolveClass("lime.tools.AdaptiveIcon");
+      if (adaptiveIconType != null)
+      {
+        Reflect.setField(this, "adaptiveIcon", Type.createInstance(adaptiveIconType, ["art/icons/android/", true]));
+      }
+      else
+      {
+        addIcon("art/icons/iconOG.png");
+      }
     }
     else if (isSwitch())
     {
