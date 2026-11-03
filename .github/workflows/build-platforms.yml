@@ -107,6 +107,9 @@ jobs:
       - name: Mark checkout as safe for Git
         run: git config --global --add safe.directory "$GITHUB_WORKSPACE"
 
+      - name: Select Nintendo Switch dependency set
+        run: cp hmm-switch.json hmm.json
+
       - name: Set up Haxe and Haxelib dependencies
         uses: ./.github/actions/setup-haxe
         with:

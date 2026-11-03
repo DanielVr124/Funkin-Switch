@@ -3,12 +3,12 @@
 **Working branch:** `switch-port-dev`  
 **Base:** `FunkinCrew/Funkin` (official V-Slice source)  
 **Windows support:** retained as a separate desktop target  
-**Nintendo Switch support:** early integration / not yet build-verified
+**Nintendo Switch support:** early integration / source compilation still being debugged
 
 ## Changes committed so far
 
 - Added Switch target configuration to `project.hxp`, including the OpenGL Lime-NX defines and Switch-specific window settings.
-- Pinned the Switch-compatible Lime, HXCPP, OpenFL, and Flixel forks in `hmm.json`.
+- Added separate dependency manifests: `hmm.json` retains the official desktop library pins, while `hmm-switch.json` pins the Switch-compatible Lime-NX, HXCPP-NX, OpenFL, Flixel, and FlxAnimate libraries.
 - Added `hx_libnx` and the Haxe HScript dependency used by the Switch branch.
 - Kept the standard Windows target in the project configuration.
 - Added Switch startup selection in `source/Main.hx`; Windows still creates the normal `FlxGame`.
@@ -21,7 +21,7 @@
 
 ## Not verified yet
 
-- Haxe source compilation on either target (the first build reached HXP generation, then failed on two mismatched optional Lime API fields; both are patched and awaiting the next run).
+- Full Haxe source compilation on either target. The Switch toolchain, HXP asset generation, HXCPP build tools, and Lime-NX native rebuild have completed in CI; the remaining source compile errors are being resolved. Windows previously compiled against the Switch-only Lime/OpenFL forks by mistake; the workflow now selects the upstream desktop dependency manifest for Windows.
 - Windows executable launch or gameplay.
 - Switch NRO generation or launch.
 - Joy-Con, paired Joy-Con, or Pro Controller testing on hardware.

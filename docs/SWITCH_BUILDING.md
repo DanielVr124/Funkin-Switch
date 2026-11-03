@@ -11,11 +11,12 @@ The Switch target currently uses the experimental Lime-NX backend with its match
 - hx_libnx: https://github.com/Slushi-Github/hx_libnx
 - devkitPro / devkitA64: https://devkitpro.org/
 
-Install Haxe 4.3.7, Git, devkitPro with the Switch development packages, and the dependencies listed by the Lime-NX README. Then, from the repository root:
+Install Haxe 4.3.7, Git, devkitPro with the Switch development packages, and the dependencies listed by the Lime-NX README. This repository keeps separate manifests so desktop builds do not accidentally use Switch-only Lime/OpenFL forks. Then, from the repository root:
 
 ```sh
 haxelib --global install hmm
 haxelib --global run hmm setup
+cp hmm-switch.json hmm.json
 hmm install
 haxelib run lime setup
 haxelib run lime rebuild switch
@@ -30,7 +31,7 @@ haxelib run lime rebuild windows
 haxelib run lime build windows -debug
 ```
 
-The repository's `.github/workflows/build-platforms.yml` runs both targets on the `switch-port-dev` branch. The Switch job uses the devkitPro `devkita64` container. On a private repository, it also packages `Funkin.nro` and an SD-card ZIP containing `switch/Funkin-Switch/Funkin.nro`.
+The default `hmm.json` tracks the official desktop dependencies. `hmm-switch.json` pins the Lime-NX / HXCPP-NX / Switch-compatible OpenFL and Flixel dependencies; copy it over `hmm.json` before installing Switch dependencies. The CI workflow performs this selection automatically for the Switch job and leaves the normal manifest in place for Windows. The repository's `.github/workflows/build-platforms.yml` runs both targets on the `switch-port-dev` branch. The Switch job uses the devkitPro `devkita64` container. On a private repository, it also packages `Funkin.nro` and an SD-card ZIP containing `switch/Funkin-Switch/Funkin.nro`.
 
 ## Current Switch integration
 
