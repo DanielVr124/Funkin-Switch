@@ -786,6 +786,15 @@ class FunkinSprite extends FlxAnimate
   var filtered:Bool = false;
   var filterOffsets:Array<Float> = [0, 0];
 
+  #if switch
+  // The Lime-NX FlxAnimate fork no longer exposes FlxSprite's
+  // checkRenderTexture() hook. FunkinSprite's custom draw methods still use
+  // this predicate to route filtered sprites through its own render texture.
+  function checkRenderTexture():Bool
+  {
+    return filters != null && filters.length > 0;
+  }
+  #else
   override function checkRenderTexture():Bool
   {
     // Forcefully enable render texture when we have filters.
@@ -793,6 +802,7 @@ class FunkinSprite extends FlxAnimate
 
     return super.checkRenderTexture();
   }
+  #end
 
   function set_filters(value:Null<Array<BitmapFilter>>):Null<Array<BitmapFilter>>
   {
