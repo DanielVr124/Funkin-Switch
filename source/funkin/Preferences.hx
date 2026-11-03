@@ -333,43 +333,43 @@ class Preferences
    * If enabled, the game will utilize VSync (or adaptive VSync) on startup.
    * @default `OFF`
    */
-  public static var vsyncMode(get, set):lime.ui.WindowVSyncMode;
+  public static var vsyncMode(get, set):funkin.util.WindowVSyncMode;
 
-  static function get_vsyncMode():lime.ui.WindowVSyncMode
+  static function get_vsyncMode():funkin.util.WindowVSyncMode
   {
     #if (mobile || web)
-    return lime.ui.WindowVSyncMode.OFF;
+    return funkin.util.WindowVSyncMode.OFF;
     #else
     var value = Save?.instance?.options?.vsyncMode ?? 'Off';
 
     return switch (value)
     {
       case 'Off':
-        lime.ui.WindowVSyncMode.OFF;
+        funkin.util.WindowVSyncMode.OFF;
       case 'On':
-        lime.ui.WindowVSyncMode.ON;
+        funkin.util.WindowVSyncMode.ON;
       case 'Adaptive':
-        lime.ui.WindowVSyncMode.ADAPTIVE;
+        funkin.util.WindowVSyncMode.ADAPTIVE;
       default:
-        lime.ui.WindowVSyncMode.OFF;
+        funkin.util.WindowVSyncMode.OFF;
     };
     #end
   }
 
-  static function set_vsyncMode(value:lime.ui.WindowVSyncMode):lime.ui.WindowVSyncMode
+  static function set_vsyncMode(value:funkin.util.WindowVSyncMode):funkin.util.WindowVSyncMode
   {
     #if (mobile || web)
-    return lime.ui.WindowVSyncMode.OFF;
+    return funkin.util.WindowVSyncMode.OFF;
     #else
     var string;
 
     switch (value)
     {
-      case lime.ui.WindowVSyncMode.OFF:
+      case funkin.util.WindowVSyncMode.OFF:
         string = 'Off';
-      case lime.ui.WindowVSyncMode.ON:
+      case funkin.util.WindowVSyncMode.ON:
         string = 'On';
-      case lime.ui.WindowVSyncMode.ADAPTIVE:
+      case funkin.util.WindowVSyncMode.ADAPTIVE:
         string = 'Adaptive';
       default:
         string = 'Off';
