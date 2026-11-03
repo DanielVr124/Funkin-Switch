@@ -20,7 +20,7 @@ class AnsiTrace
 {
   private static final HEADER_REGEX = ~/^\s*\[(.*?)\]\s*(.*)$/;
   #if (sys && FEATURE_DEBUG_FILE_LOGGING)
-  private static final logFilePath:String = 'logs/log-${DateUtil.generateTimestamp()}.txt';
+  private static final logFilePath:String = #if switch 'sdmc:/switch/Funkin-Switch/logs/log-${DateUtil.generateTimestamp()}.txt' #else 'logs/log-${DateUtil.generateTimestamp()}.txt' #end;
   private static var logFile:Null<FileOutput> = null;
   private static var logFileClosed:Bool = false;
   #end
