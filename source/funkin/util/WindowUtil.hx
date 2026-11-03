@@ -188,16 +188,36 @@ class WindowUtil
    * Modifies the VSync mode of the application window.
    * @param value The desired VSync mode to use.
    */
-  public static function setVSyncMode(value:lime.ui.WindowVSyncMode):Void
+  public static function setVSyncMode(value:WindowVSyncMode):Void
   {
-    var res:Bool = FlxG.stage.application.window.setVSyncMode(value);
+    #if switch
+    // Lime-NX uses lime.app.VSyncMode and exposes it as a Window property.
+    var nativeMode:lime.app.VSyncMode = switch (value)
+    {
+      case WindowVSyncMode.OFF: lime.app.VSyncMode.Off;
+      case WindowVSyncMode.ON: lime.app.VSyncMode.On;
+      case WindowVSyncMode.ADAPTIVE: lime.app.VSyncMode.Adaptive;
+      default: lime.app.VSyncMode.Off;
+    };
+    FlxG.stage.application.window.vsyncMode = nativeMode;
+    #else
+    // Desktop Lime uses the older WindowVSyncMode API.
+    var nativeMode:lime.ui.WindowVSyncMode = switch (value)
+    {
+      case WindowVSyncMode.OFF: lime.ui.WindowVSyncMode.OFF;
+      case WindowVSyncMode.ON: lime.ui.WindowVSyncMode.ON;
+      case WindowVSyncMode.ADAPTIVE: lime.ui.WindowVSyncMode.ADAPTIVE;
+      default: lime.ui.WindowVSyncMode.OFF;
+    };
+    var res:Bool = FlxG.stage.application.window.setVSyncMode(nativeMode);
 
     // SDL_GL_SetSwapInterval returns the value we assigned on success, https://wiki.libsdl.org/SDL2/SDL_GL_GetSwapInterval#return-value.
-    // In lime, we can compare this to the original value to get a boolean.
+    // In Lime, we can compare this to the original value to get a boolean.
     if (!res)
     {
       trace('Failed to set VSync mode to ' + value);
       FlxG.stage.application.window.setVSyncMode(lime.ui.WindowVSyncMode.OFF);
     }
+    #end
   }
 }
