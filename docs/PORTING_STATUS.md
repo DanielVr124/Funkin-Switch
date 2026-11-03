@@ -16,6 +16,7 @@
 - On Switch, precise rhythm input uses libnx exclusively to avoid SDL/libnx double-dispatch; SDL remains enabled for general menu navigation and sticks.
 - Configured persistent saves under the Switch SD card's `switch/Funkin-Switch/saves` directory.
 - Redirected crash reports and debug trace logs to `sdmc:/switch/Funkin-Switch/logs`; Switch directory creation now builds missing parent folders on a fresh SD card.
+- Routed the user mods folder to `sdmc:/switch/Funkin-Switch/mods` so startup never tries to create it inside read-only ROMFS.
 - Added a CI workflow with separate Windows and Switch build jobs.
 
 ## Not verified yet
