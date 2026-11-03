@@ -22,6 +22,10 @@ import openfl.Lib;
 import openfl.media.Video;
 import openfl.net.NetStream;
 import funkin.util.WindowUtil;
+#if switch
+import nx.NXGame;
+import nx.NXMain;
+#end
 
 using funkin.util.AnsiUtil;
 
@@ -47,6 +51,9 @@ class Main extends Sprite
     #elseif ios
     // On iOS use Documents Dir.
     Sys.setCwd(haxe.io.Path.addTrailingSlash(lime.system.System.documentsDirectory));
+    #elseif switch
+    // Nintendo Switch application assets are mounted read-only through RomFS.
+    Sys.setCwd("romfs:/");
     #end
 
     // We need to make the crash handler LITERALLY FIRST so nothing EVER gets past it.
@@ -176,8 +183,16 @@ class Main extends Sprite
 
     var framerate:Int = Preferences.unlockedFramerate ? 0 : Preferences.framerate;
 
-    var game:FlxGame = new FlxGame(gameWidth, gameHeight, initialState, framerate, framerate, skipSplash,
+    var game:FlxGame;
+    #if switch
+    // Initialize libnx controller services before the first Flixel update.
+    NXMain.init();
+    game = new NXGame(gameWidth, gameHeight, initialState, framerate, framerate, skipSplash,
       (FlxG.stage.window.fullscreen || Preferences.autoFullscreen));
+    #else
+    game = new FlxGame(gameWidth, gameHeight, initialState, framerate, framerate, skipSplash,
+      (FlxG.stage.window.fullscreen || Preferences.autoFullscreen));
+    #end
 
     // FlxG.game._customSoundTray wants just the class, it calls new from
     // create() in there, which gets called when it's added to the stage
