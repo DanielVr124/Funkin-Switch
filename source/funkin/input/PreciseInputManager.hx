@@ -254,6 +254,13 @@ class PreciseInputManager extends FlxKeyManager<FlxKey, PreciseInputList>
   {
     clearButtons();
 
+    #if switch
+    // Switch rhythm input comes from the libnx HID poller. Lime/SDL still
+    // handles Flixel menu navigation, but registering its precise gamepad
+    // callbacks here would double-dispatch the same Joy-Con/Pro Controller
+    // presses into the note judgement system.
+    return;
+    #else
     var limeGamepad = FlxGamepadUtil.getLimeGamepad(gamepad);
     var callbacks = {
       onButtonDown: handleButtonDown.bind(gamepad),
@@ -284,6 +291,7 @@ class PreciseInputManager extends FlxKeyManager<FlxKey, PreciseInputList>
         buttonListDirEntry.set(button, noteDirection);
       }
     }
+    #end
   }
 
   /**
