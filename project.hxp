@@ -118,6 +118,11 @@ class Project extends HXProject
    */
   static var IOS_TEAM_ID:String = "Z7G7AVNGSH";
 
+  // Nintendo Switch homebrew metadata. Override SWITCH_IP in the build environment
+  // when using `lime test switch` to deploy to a console on the local network.
+  static final SWITCH_APP_ID:String = "0x0100F1F000000001";
+  static var SWITCH_IP:String = Sys.getEnv("SWITCH_IP") ?? "";
+
   /**
    * A list of asset file globs to exclude from ASTC compression when creating optimized mobile builds.
    */
@@ -683,6 +688,16 @@ class Project extends HXProject
       this.window.height = 0;
     }
 
+    if (isSwitch())
+    {
+      this.window.orientation = Orientation.LANDSCAPE;
+      this.window.fullscreen = true;
+      this.window.resizable = false;
+      this.window.hardware = true;
+      this.window.width = 0;
+      this.window.height = 0;
+    }
+
     if (isAndroid())
     {
       if (EXCLUDE_ARMV7.isEnabled(this))
@@ -735,6 +750,8 @@ class Project extends HXProject
         info('Target Platform: IOS');
       case Platform.HTML5:
         info('Target Platform: HTML5');
+      case Platform.SWITCH:
+        info('Target Platform: Nintendo Switch');
       // See lime.tools.Platform for a full list.
       // case Platform.EMSCRITEN: // A WebAssembly build might be interesting...
       // case Platform.AIR:
@@ -856,12 +873,14 @@ class Project extends HXProject
     FEATURE_LOG_TRACE.apply(this, true);
     FEATURE_DEBUG_FILE_LOGGING.apply(this, FEATURE_DEBUG_FUNCTIONS.isEnabled(this));
     FEATURE_NAUGHTYNESS.apply(this, true);
-    FEATURE_OPEN_URL.apply(this, true);
+    // The Switch homebrew backend does not currently support opening external URLs.
+    FEATURE_OPEN_URL.apply(this, !isSwitch());
     FEATURE_PARTIAL_SOUNDS.apply(this, true);
     FEATURE_POLYMOD_MODS.apply(this, true);
 
-    // Video playback should be enabled on desktop, web, and mobile.
-    FEATURE_VIDEO_PLAYBACK.apply(this, true);
+    // hxvlc does not currently have a Switch backend. Keep cutscene playback
+    // enabled on Windows and other supported targets.
+    FEATURE_VIDEO_PLAYBACK.apply(this, !isSwitch());
 
     // Video subtitles only work via using hxvlc.
     FEATURE_VIDEO_SUBTITLES.apply(this, FEATURE_VIDEO_PLAYBACK.isEnabled(this) && !isWeb());
@@ -885,10 +904,10 @@ class Project extends HXProject
 
     // Should be true except on web and mobile builds.
     // Debug editors aren't built to work on web or mobile right now.
-    FEATURE_DEBUG_MENU.apply(this, !(isWeb() || isMobile()));
-    FEATURE_ANIMATION_EDITOR.apply(this, !(isWeb() || isMobile()));
-    FEATURE_CHART_EDITOR.apply(this, !(isWeb() || isMobile()));
-    FEATURE_STAGE_EDITOR.apply(this, !(isWeb() || isMobile()));
+    FEATURE_DEBUG_MENU.apply(this, !(isWeb() || isMobile() || isSwitch()));
+    FEATURE_ANIMATION_EDITOR.apply(this, !(isWeb() || isMobile() || isSwitch()));
+    FEATURE_CHART_EDITOR.apply(this, !(isWeb() || isMobile() || isSwitch()));
+    FEATURE_STAGE_EDITOR.apply(this, !(isWeb() || isMobile() || isSwitch()));
     FEATURE_HAXEUI.apply(this, FEATURE_ANIMATION_EDITOR.isEnabled(this)
       || FEATURE_CHART_EDITOR.isEnabled(this)
       || FEATURE_STAGE_EDITOR.isEnabled(this));
@@ -902,7 +921,7 @@ class Project extends HXProject
     FEATURE_SCREENSHOTS.apply(this, isDesktop());
 
     // Should be true except on mobile builds.
-    FEATURE_FILE_DROP.apply(this, !isMobile());
+    FEATURE_FILE_DROP.apply(this, !(isMobile() || isSwitch()));
 
     // Audio context issues only exist on web builds.
     FEATURE_TOUCH_HERE_TO_PLAY.apply(this, isWeb());
@@ -1049,6 +1068,19 @@ class Project extends HXProject
       // setHaxedef("HXCPP_TRACY_INCLUDE_CALLSTACKS"); // Inspect callstacks per zone, inflating telemetry data
 
       setHaxedef("absolute-paths"); // Fix source locations so Tracy can see them
+    }
+
+    if (isSwitch())
+    {
+      // Lime-NX currently renders through OpenGL; Cairo/Vulkan are not available.
+      setHaxedef("HX_NX");
+      setHaxedef("lime-opengl");
+      setHaxedef("lime-cairo", "false");
+      this.defines.set("LIME_CAIRO", "0");
+      this.defines.set("LIME_OPENGL", "1");
+      this.defines.set("APP_ID", SWITCH_APP_ID);
+
+      if (SWITCH_IP != "") config.set("switch.ip", SWITCH_IP);
     }
   }
 
@@ -1320,6 +1352,12 @@ class Project extends HXProject
       addHaxelib('hxgamemode'); // FeralInteractive gamemode
     }
 
+    if (isSwitch())
+    {
+      // libnx bindings for controller, applet, and Switch filesystem services.
+      addHaxelib('hx_libnx');
+    }
+
     if (FEATURE_DISCORD_RPC.isEnabled(this))
     {
       addHaxelib('hxdiscord_rpc'); // Discord API
@@ -1573,6 +1611,12 @@ class Project extends HXProject
       // Adaptive icons
       adaptiveIcon = new AdaptiveIcon('art/icons/android/', true);
     }
+    else if (isSwitch())
+    {
+      // Use the official game icon as the Homebrew Menu icon until a dedicated
+      // Switch icon is added to the art submodule.
+      addIcon("art/icons/iconOG.png", 256);
+    }
     else if (isIOS())
     {
       // Note: the icons on iOS (and likely even android too) support nice P3 colors space
@@ -1714,6 +1758,11 @@ class Project extends HXProject
   public function isIOS():Bool
   {
     return this.target == Platform.IOS;
+  }
+
+  public function isSwitch():Bool
+  {
+    return this.target == Platform.SWITCH;
   }
 
   public function isIOSSimulator():Bool
