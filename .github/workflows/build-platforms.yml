@@ -48,7 +48,7 @@ jobs:
         uses: actions/checkout@v4
         with:
           submodules: recursive
-          fetch-depth: 0
+          fetch-depth: 1
 
       - name: Set up Haxe and Haxelib dependencies
         uses: ./.github/actions/setup-haxe
@@ -105,7 +105,7 @@ jobs:
         uses: actions/checkout@v4
         with:
           submodules: recursive
-          fetch-depth: 0
+          fetch-depth: 1
 
       - name: Mark checkout as safe for Git
         run: git config --global --add safe.directory "$GITHUB_WORKSPACE"
