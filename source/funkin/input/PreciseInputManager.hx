@@ -82,6 +82,8 @@ class PreciseInputManager extends FlxKeyManager<FlxKey, PreciseInputList>
 
   #if switch
   var _nxInputHandler:Null<NXPreciseInputHandler>;
+  var _nxButtonDirections:Map<Int, NoteDirection>;
+  var _nxHeldButtons:Map<Int, Bool>;
   #end
 
   public function new()
@@ -115,6 +117,8 @@ class PreciseInputManager extends FlxKeyManager<FlxKey, PreciseInputList>
     onInputReleased = new FlxTypedSignal<PreciseInputEvent->Void>();
 
     #if switch
+    _nxButtonDirections = new Map<Int, NoteDirection>();
+    _nxHeldButtons = new Map<Int, Bool>();
     _nxInputHandler = new NXPreciseInputHandler();
     _nxInputHandler.onButtonPressed = handleNXButtonPressed;
     _nxInputHandler.onButtonReleased = handleNXButtonReleased;
@@ -133,14 +137,34 @@ class PreciseInputManager extends FlxKeyManager<FlxKey, PreciseInputList>
 
   function handleNXButtonPressed(direction:NoteDirection, timestamp:Int64, buttonCode:Int):Void
   {
+    _nxButtonDirections.set(buttonCode, direction);
+    _nxHeldButtons.set(buttonCode, true);
     onInputPressed.dispatch({noteDirection: direction, timestamp: timestamp, keyCode: buttonCode});
     _dirPressTimestamps.set(direction, timestamp);
   }
 
   function handleNXButtonReleased(direction:NoteDirection, timestamp:Int64, buttonCode:Int):Void
   {
+    _nxButtonDirections.set(buttonCode, direction);
+    _nxHeldButtons.set(buttonCode, false);
     onInputReleased.dispatch({noteDirection: direction, timestamp: timestamp, keyCode: buttonCode});
     _dirReleaseTimestamps.set(direction, timestamp);
+  }
+
+  /**
+   * Whether any physical Switch button mapped to this lane is still held.
+   * This is queried by PreciseInputList.checkDir() for sustain-note handling.
+   */
+  public function isNXDirectionPressed(direction:NoteDirection):Bool
+  {
+    for (buttonCode in _nxHeldButtons.keys())
+    {
+      if (_nxHeldButtons.get(buttonCode) == true && _nxButtonDirections.get(buttonCode) == direction)
+      {
+        return true;
+      }
+    }
+    return false;
   }
   #end
 
@@ -443,6 +467,8 @@ class PreciseInputManager extends FlxKeyManager<FlxKey, PreciseInputList>
     #if switch
     _nxInputHandler?.destroy();
     _nxInputHandler = null;
+    _nxButtonDirections.clear();
+    _nxHeldButtons.clear();
     #end
   }
 }
@@ -479,6 +505,10 @@ class PreciseInputList extends FlxKeyList
 
   public function checkDir(noteDir:NoteDirection):Bool
   {
+    #if switch
+    if (_preciseInputManager.isNXDirectionPressed(noteDir)) return true;
+    #end
+
     for (key in getKeysForDir(noteDir))
     {
       if (check(_preciseInputManager.getInputByKey(key)?.ID)) return true;
