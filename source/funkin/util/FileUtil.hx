@@ -759,6 +759,24 @@ class FileUtil
    */
   public static function createDirIfNotExists(dir:String):Void
   {
+    #if switch
+    // The homebrew save/log root may not exist on a fresh SD card. libnx
+    // requires each parent folder to exist before its child can be created.
+    var normalizedDir = StringTools.replace(dir, "\\", "/");
+    var parts = normalizedDir.split("/");
+    var currentPath = parts.length > 0 && parts[0] == "sdmc:" ? "sdmc:" : "";
+
+    for (part in parts)
+    {
+      if (part == "" || part == "sdmc:") continue;
+
+      currentPath = currentPath == "" ? part : currentPath + "/" + part;
+      if (!sys.FileSystem.exists(currentPath))
+      {
+        sys.FileSystem.createDirectory(currentPath);
+      }
+    }
+    #else
     if (!directoryExists(dir))
     {
       #if sys
@@ -767,6 +785,7 @@ class FileUtil
       throw 'Directory creation is not supported on this platform.';
       #end
     }
+    #end
   }
 
   /**
