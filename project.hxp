@@ -1610,7 +1610,9 @@ class Project extends HXProject
     if (isAndroid())
     {
       // Adaptive icons
-      adaptiveIcon = new AdaptiveIcon('art/icons/android/', true);
+      // Older Lime-NX HXProject APIs do not declare adaptiveIcon; keep this
+      // optional Android field dynamic so newer desktop/mobile Lime builds retain it.
+      Reflect.setField(this, "adaptiveIcon", new AdaptiveIcon('art/icons/android/', true));
     }
     else if (isSwitch())
     {
@@ -1914,7 +1916,10 @@ class Project extends HXProject
 
     if (padName != null && isBundle())
     {
-      asset.deliveryPackName = padName;
+      // deliveryPackName is only consumed by Android Play Asset Delivery.
+      // The pinned Lime-NX Asset type predates that optional field, so set it
+      // dynamically rather than requiring it at compile time on every target.
+      Reflect.setField(asset, "deliveryPackName", padName);
     }
 
     this.assets.push(asset);
