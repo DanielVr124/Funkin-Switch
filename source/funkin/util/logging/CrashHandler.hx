@@ -11,7 +11,7 @@ import flixel.FlxG.FlxRenderMethod;
 @:nullSafety
 class CrashHandler
 {
-  public static final LOG_FOLDER = 'logs';
+  public static final LOG_FOLDER:String = #if switch 'sdmc:/switch/Funkin-Switch/logs' #else 'logs' #end;
 
   /**
    * Called before exiting the game when a standard error occurs, like a thrown exception.
