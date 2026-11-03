@@ -1,0 +1,117 @@
+name: Build Windows and Nintendo Switch
+
+on:
+  push:
+    branches:
+      - switch-port-dev
+  pull_request:
+    branches:
+      - switch-port-dev
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  windows:
+    name: Windows desktop build
+    runs-on: windows-2022
+    defaults:
+      run:
+        shell: bash
+    steps:
+      - name: Checkout source and submodules
+        uses: actions/checkout@v4
+        with:
+          submodules: recursive
+          fetch-depth: 0
+
+      - name: Set up Haxe and Haxelib dependencies
+        uses: ./.github/actions/setup-haxe
+        with:
+          haxe: '4.3.7'
+          targets: windows
+          gh-token: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Compile HXCPP build tools
+        shell: bash
+        run: |
+          cd .haxelib/hxcpp/git/tools/hxcpp
+          haxe compile.hxml
+
+      - name: Set up Lime
+        run: haxelib run lime setup
+
+      - name: Rebuild Lime for Windows
+        run: haxelib run lime rebuild windows
+
+      - name: Build Friday Night Funkin' for Windows
+        run: haxelib run lime build windows -v -release -DGITHUB_BUILD
+        timeout-minutes: 120
+
+      - name: Upload Windows build (private repositories only)
+        if: ${{ github.repository_visibility == 'private' }}
+        uses: actions/upload-artifact@v4
+        with:
+          name: FridayNightFunkin-Windows-${{ github.sha }}
+          path: export/release/windows/bin/
+          if-no-files-found: error
+          retention-days: 14
+
+      - name: Report artifact restriction
+        if: ${{ github.repository_visibility != 'private' }}
+        run: echo "Build succeeded, but binary artifacts are not uploaded from a public repository because the build contains proprietary game assets."
+
+  switch:
+    name: Nintendo Switch homebrew build
+    runs-on: ubuntu-latest
+    container:
+      image: devkitpro/devkita64:20260219
+    defaults:
+      run:
+        shell: bash
+    steps:
+      - name: Checkout source and submodules
+        uses: actions/checkout@v4
+        with:
+          submodules: recursive
+          fetch-depth: 0
+
+      - name: Mark checkout as safe for Git
+        run: git config --global --add safe.directory "$GITHUB_WORKSPACE"
+
+      - name: Set up Haxe and Haxelib dependencies
+        uses: ./.github/actions/setup-haxe
+        with:
+          haxe: '4.3.7'
+          targets: switch
+          gh-token: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Compile HXCPP build tools
+        run: |
+          cd .haxelib/hxcpp/git/tools/hxcpp
+          haxe compile.hxml
+
+      - name: Set up Lime
+        run: haxelib run lime setup
+
+      - name: Rebuild Lime for Nintendo Switch
+        run: haxelib run lime rebuild switch
+        timeout-minutes: 90
+
+      - name: Build Friday Night Funkin' for Nintendo Switch
+        run: haxelib run lime build switch -v -release -DGITHUB_BUILD
+        timeout-minutes: 120
+
+      - name: Upload Switch build (private repositories only)
+        if: ${{ github.repository_visibility == 'private' }}
+        uses: actions/upload-artifact@v4
+        with:
+          name: FridayNightFunkin-Switch-${{ github.sha }}
+          path: export/release/switch/bin/
+          if-no-files-found: error
+          retention-days: 14
+
+      - name: Report artifact restriction
+        if: ${{ github.repository_visibility != 'private' }}
+        run: echo "Build succeeded, but NRO/asset artifacts are not uploaded from a public repository because they may contain proprietary game assets."
