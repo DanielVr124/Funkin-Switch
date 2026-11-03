@@ -189,8 +189,8 @@ class PreciseInputManager extends FlxKeyManager<FlxKey, PreciseInputList>
     // See https://web.dev/coop-coep to enable headers which allow for more precise timestamps.
     return haxe.Int64.fromFloat(js.Browser.window.performance.now()) * Constants.NS_PER_MS;
     #elseif switch
-    // The Switch Lime backend exposes SDL's millisecond tick counter.
-    return lime._internal.backend.native.NativeCFFI.lime_sdl_get_ticks() * Constants.NS_PER_MS;
+    // Lime-NX implements System.getTimer() with SDL_GetTicks(), in milliseconds.
+    return Int64.fromInt(lime.system.System.getTimer()) * Constants.NS_PER_MS;
     #elseif lime_cffi
     // NOTE: If the game hard crashes on this line, rebuild Lime!
     // `lime rebuild windows -clean`
