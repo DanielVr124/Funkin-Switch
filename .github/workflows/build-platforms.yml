@@ -137,7 +137,7 @@ jobs:
         run: |
           set -euo pipefail
           mkdir -p dist/sd-card/switch/Funkin-Switch/mods
-          cp export/switch/bin/Funkin.nro dist/sd-card/switch/Funkin-Switch/Funkin.nro
+          cp export/release/switch/bin/Funkin.nro dist/sd-card/switch/Funkin-Switch/Funkin.nro
           cat > dist/sd-card/README.txt <<'EOF'
           Friday Night Funkin' - Nintendo Switch homebrew
 
@@ -164,7 +164,7 @@ jobs:
         with:
           name: FridayNightFunkin-Switch-${{ github.sha }}
           path: |
-            export/switch/bin/Funkin.nro
+            export/release/switch/bin/Funkin.nro
             dist/FridayNightFunkin-Switch-SDCard.zip
           if-no-files-found: error
           retention-days: 14
