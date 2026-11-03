@@ -63,9 +63,6 @@ jobs:
           cd .haxelib/hxcpp/git/tools/hxcpp
           haxe compile.hxml
 
-      - name: Set up Lime
-        run: haxelib run lime setup
-
       - name: Rebuild Lime for Windows
         run: haxelib run lime rebuild windows
 
@@ -121,9 +118,6 @@ jobs:
         run: |
           cd .haxelib/hxcpp/git/tools/hxcpp
           haxe compile.hxml
-
-      - name: Set up Lime
-        run: haxelib run lime setup
 
       - name: Rebuild Lime for Nintendo Switch
         run: haxelib run lime rebuild switch
