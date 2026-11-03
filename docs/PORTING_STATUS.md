@@ -14,11 +14,12 @@
 - Added Switch startup selection in `source/Main.hx`; Windows still creates the normal `FlxGame`.
 - Added native HID polling and a precise rhythm-input bridge for D-pad and Y/B/X/A button press/release transitions.
 - Configured persistent saves under the Switch SD card's `switch/Funkin-Switch/saves` directory.
+- Redirected crash reports and debug trace logs to `sdmc:/switch/Funkin-Switch/logs`; Switch directory creation now builds missing parent folders on a fresh SD card.
 - Added a CI workflow with separate Windows and Switch build jobs.
 
 ## Not verified yet
 
-- Haxe compilation on either target.
+- Haxe source compilation on either target (the first build reached HXP generation, then failed on two mismatched optional Lime API fields; both are patched and awaiting the next run).
 - Windows executable launch or gameplay.
 - Switch NRO generation or launch.
 - Joy-Con, paired Joy-Con, or Pro Controller testing on hardware.
