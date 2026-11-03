@@ -157,6 +157,11 @@ class Main extends Sprite
     FlxG.signals.preUpdate.add(repositionCounters.bind(true));
     #end
 
+    // Switch game assets live in read-only RomFS; persistent progress belongs on SD.
+    #if switch
+    flixel.util.FlxSave._SWITCH_SAVE_PATH = "sdmc:/switch/Funkin-Switch/saves";
+    #end
+
     // George recommends binding the save before FlxGame is created.
     Save.load();
 
