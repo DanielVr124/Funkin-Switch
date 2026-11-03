@@ -18,6 +18,9 @@ import lime.ui.KeyCode;
 import lime.ui.KeyModifier;
 import openfl.events.KeyboardEvent;
 import openfl.ui.Keyboard;
+#if switch
+import nx.controls.NXPreciseInputHandler;
+#end
 
 /**
  * A precise input manager that:
@@ -77,6 +80,10 @@ class PreciseInputManager extends FlxKeyManager<FlxKey, PreciseInputList>
       onButtonUp:LimeGamepadButton->Int64->Void
     }>;
 
+  #if switch
+  var _nxInputHandler:Null<NXPreciseInputHandler>;
+  #end
+
   public function new()
   {
     super(PreciseInputList.new);
@@ -106,7 +113,36 @@ class PreciseInputManager extends FlxKeyManager<FlxKey, PreciseInputList>
 
     onInputPressed = new FlxTypedSignal<PreciseInputEvent->Void>();
     onInputReleased = new FlxTypedSignal<PreciseInputEvent->Void>();
+
+    #if switch
+    _nxInputHandler = new NXPreciseInputHandler();
+    _nxInputHandler.onButtonPressed = handleNXButtonPressed;
+    _nxInputHandler.onButtonReleased = handleNXButtonReleased;
+    #end
   }
+
+  #if switch
+  /**
+   * Update Switch-specific controller input once per game frame.
+   * Called by NXMain through the Switch FlxGame subclass.
+   */
+  public function updateNXInput():Void
+  {
+    _nxInputHandler?.update();
+  }
+
+  function handleNXButtonPressed(direction:NoteDirection, timestamp:Int64, buttonCode:Int):Void
+  {
+    onInputPressed.dispatch({noteDirection: direction, timestamp: timestamp, keyCode: buttonCode});
+    _dirPressTimestamps.set(direction, timestamp);
+  }
+
+  function handleNXButtonReleased(direction:NoteDirection, timestamp:Int64, buttonCode:Int):Void
+  {
+    onInputReleased.dispatch({noteDirection: direction, timestamp: timestamp, keyCode: buttonCode});
+    _dirReleaseTimestamps.set(direction, timestamp);
+  }
+  #end
 
   public static function getKeysForDirection(controls:Controls, noteDirection:NoteDirection)
   {
@@ -152,6 +188,9 @@ class PreciseInputManager extends FlxKeyManager<FlxKey, PreciseInputList>
     // This is because of browser safeguards against timing attacks.
     // See https://web.dev/coop-coep to enable headers which allow for more precise timestamps.
     return haxe.Int64.fromFloat(js.Browser.window.performance.now()) * Constants.NS_PER_MS;
+    #elseif switch
+    // The Switch Lime backend exposes SDL's millisecond tick counter.
+    return lime._internal.backend.native.NativeCFFI.lime_sdl_get_ticks() * Constants.NS_PER_MS;
     #elseif lime_cffi
     // NOTE: If the game hard crashes on this line, rebuild Lime!
     // `lime rebuild windows -clean`
@@ -400,6 +439,11 @@ class PreciseInputManager extends FlxKeyManager<FlxKey, PreciseInputList>
 
     clearKeys();
     clearButtons();
+
+    #if switch
+    _nxInputHandler?.destroy();
+    _nxInputHandler = null;
+    #end
   }
 }
 
