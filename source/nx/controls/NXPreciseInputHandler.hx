@@ -56,11 +56,11 @@ class NXPreciseInputHandler
 
     if (isPressed && !wasPressed)
     {
-      onButtonPressed?.(direction, timestamp, buttonCode);
+      if (onButtonPressed != null) onButtonPressed(direction, timestamp, buttonCode);
     }
     else if (!isPressed && wasPressed)
     {
-      onButtonReleased?.(direction, timestamp, buttonCode);
+      if (onButtonReleased != null) onButtonReleased(direction, timestamp, buttonCode);
     }
 
     _previous.set(button, isPressed);
