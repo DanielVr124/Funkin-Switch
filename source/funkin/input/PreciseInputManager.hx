@@ -108,8 +108,10 @@ class PreciseInputManager extends FlxKeyManager<FlxKey, PreciseInputList>
     // Keyboard
     FlxG.stage.removeEventListener(KeyboardEvent.KEY_DOWN, onKeyDown);
     FlxG.stage.removeEventListener(KeyboardEvent.KEY_UP, onKeyUp);
+    #if !switch
     FlxG.stage.application.window.onKeyDownPrecise.add(handleKeyDown);
     FlxG.stage.application.window.onKeyUpPrecise.add(handleKeyUp);
+    #end
 
     preventDefaultKeys = getPreventDefaultKeys();
 
@@ -214,7 +216,7 @@ class PreciseInputManager extends FlxKeyManager<FlxKey, PreciseInputList>
     return haxe.Int64.fromFloat(js.Browser.window.performance.now()) * Constants.NS_PER_MS;
     #elseif switch
     // Lime-NX implements System.getTimer() with SDL_GetTicks(), in milliseconds.
-    return Int64.fromInt(lime.system.System.getTimer()) * Constants.NS_PER_MS;
+    return Int64.ofInt(lime.system.System.getTimer()) * Constants.NS_PER_MS;
     #elseif lime_cffi
     // NOTE: If the game hard crashes on this line, rebuild Lime!
     // `lime rebuild windows -clean`
@@ -453,6 +455,7 @@ class PreciseInputManager extends FlxKeyManager<FlxKey, PreciseInputList>
     _buttonListArray = [];
     _buttonListDir.clear();
 
+    #if !switch
     for (gamepad in _deviceBinds.keys())
     {
       var callbacks = _deviceBinds.get(gamepad);
@@ -460,14 +463,17 @@ class PreciseInputManager extends FlxKeyManager<FlxKey, PreciseInputList>
       limeGamepad.onButtonDownPrecise.remove(callbacks.onButtonDown);
       limeGamepad.onButtonUpPrecise.remove(callbacks.onButtonUp);
     }
+    #end
     _deviceBinds.clear();
   }
 
   override public function destroy():Void
   {
     // Keyboard
+    #if !switch
     FlxG.stage.application.window.onKeyDownPrecise.remove(handleKeyDown);
     FlxG.stage.application.window.onKeyUpPrecise.remove(handleKeyUp);
+    #end
 
     clearKeys();
     clearButtons();

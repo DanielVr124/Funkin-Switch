@@ -25,7 +25,12 @@ class FunkTrail extends FlxTrail
    */
   public function new(target:FlxSprite, ?graphic:FlxGraphicAsset, length:Int = 10, delay:Float = 0.1, alpha:Float = 0.4, diff:Float = 0.05)
   {
+    #if switch
+    // The Switch FlxTrail fork measures delay in frames, not seconds.
+    super(target, graphic, length, Std.int(Math.round(delay * 60)), alpha, diff);
+    #else
     super(target, graphic, length, delay, alpha, diff);
+    #end
   }
 
   /**

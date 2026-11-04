@@ -133,7 +133,7 @@ class FileUtil
    */
   public static function browseForDirectory(dialogTitle:String, onSelect:(String) -> Void, ?onCancel:() -> Void, ?defaultPath:String):Void
   {
-    #if html5
+    #if (html5 || switch)
     trace('WARNING: browseForDirectory not implemented for this platform');
 
     if (onCancel != null)
@@ -169,7 +169,7 @@ class FileUtil
   public static function browseForFile(dialogTitle:String, ?typeFilter:Array<FileFilter>, onSelect:(SelectedFileData) -> Void, ?onCancel:() -> Void,
       ?defaultPath:String):Void
   {
-    #if html5
+    #if (html5 || switch)
     trace('WARNING: browseForFile not implemented for this platform');
 
     if (onCancel != null)
@@ -206,7 +206,7 @@ class FileUtil
   public static function browseForMultipleFiles(dialogTitle:String, ?typeFilter:Array<FileFilter>, onSelect:(Array<String>) -> Void, ?onCancel:() -> Void,
       ?defaultPath:String):Void
   {
-    #if html5
+    #if (html5 || switch)
     trace('WARNING: browseForMultipleFiles not implemented for this platform');
 
     if (onCancel != null)
@@ -243,7 +243,7 @@ class FileUtil
   public static function browseForSaveFile(dialogTitle:String, ?typeFilter:Array<FileFilter>, onSelect:(String) -> Void, ?onCancel:() -> Void,
       ?defaultPath:String):Void
   {
-    #if html5
+    #if (html5 || switch)
     trace('WARNING: browseForSaveFile not implemented for this platform');
 
     if (onCancel != null)
@@ -279,7 +279,7 @@ class FileUtil
   public static function saveFile(dialogTitle:String, data:Bytes, ?typeFilter:Array<FileFilter>, ?onSave:(String) -> Void, ?onCancel:() -> Void,
       ?defaultPath:String):Void
   {
-    #if html5
+    #if (html5 || switch)
     trace('WARNING: saveFile not implemented for this platform');
 
     if (onCancel != null)
@@ -293,7 +293,7 @@ class FileUtil
       {
         if (data != null)
         {
-          Bytes.toFile(filepath, data);
+          sys.io.File.saveBytes(filepath, data);
         }
 
         if (onSave != null)
@@ -323,7 +323,7 @@ class FileUtil
   public static function saveMultipleFiles(resources:Array<Entry>, ?onSaveAll:(Array<String>) -> Void, ?onCancel:() -> Void, ?defaultPath:String,
       force:Bool = false):Void
   {
-    #if html5
+    #if (html5 || switch)
     trace('WARNING: saveMultipleFiles not implemented for this platform');
 
     if (onCancel != null)
