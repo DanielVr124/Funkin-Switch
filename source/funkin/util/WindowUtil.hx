@@ -161,7 +161,11 @@ class WindowUtil
    */
   public static function showError(name:String, desc:String):Void
   {
+    #if switch
+    lime.app.Application.current.window.alert(desc, name);
+    #else
     lime.app.Application.current.window.alert(lime.ui.MessageBoxType.ERROR, desc, name);
+    #end
   }
 
   /**
@@ -171,7 +175,11 @@ class WindowUtil
    */
   public static function showWarning(name:String, desc:String):Void
   {
+    #if switch
+    lime.app.Application.current.window.alert(desc, name);
+    #else
     lime.app.Application.current.window.alert(lime.ui.MessageBoxType.WARNING, desc, name);
+    #end
   }
 
   /**
@@ -181,7 +189,11 @@ class WindowUtil
    */
   public static function showInformation(name:String, desc:String):Void
   {
+    #if switch
+    lime.app.Application.current.window.alert(desc, name);
+    #else
     lime.app.Application.current.window.alert(lime.ui.MessageBoxType.INFORMATION, desc, name);
+    #end
   }
 
   /**
