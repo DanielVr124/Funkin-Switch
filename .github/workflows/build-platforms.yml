@@ -6,6 +6,7 @@ on:
       - switch-port-dev
     paths:
       - 'source/**'
+      - 'tools/patch-switch-dependencies.py'
       - 'project.hxp'
       - 'hmm.json'
       - 'hmm-switch.json'
@@ -118,6 +119,9 @@ jobs:
           haxe: '4.3.7'
           targets: switch
           gh-token: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Patch Switch dependency compatibility
+        run: python3 tools/patch-switch-dependencies.py
 
       - name: Compile HXCPP build tools
         run: |

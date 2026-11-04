@@ -414,7 +414,11 @@ class SongMenuItem extends FlxSpriteGroup
     FlxTween.tween(impactThing.scale, {x: 2.5, y: 2.5}, 0.5);
     // FlxTween.tween(impactThing, {alpha: 0}, 0.5);
 
+    #if switch
     evilTrail = new FlxTrail(impactThing, null, 15, 2, 0.01, 0.069);
+    #else
+    evilTrail = new FlxTrail(impactThing, null, 15, 0.03, 0.01, 0.069);
+    #end
     evilTrail.blend = BlendMode.ADD;
     evilTrail.zIndex = capsule.zIndex - 5;
     FlxTween.tween(evilTrail, {alpha: 0}, 0.6, {
