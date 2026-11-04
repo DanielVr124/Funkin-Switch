@@ -736,21 +736,23 @@ class Project extends HXProject
   function displayTarget()
   {
     // Display the target operating system.
-    switch (this.target)
+    // Use the underlying target string instead of Lime Platform enum members.
+    // The desktop Lime version does not declare SWITCH, while Lime-NX does.
+    switch (Std.string(this.target).toLowerCase())
     {
-      case Platform.WINDOWS:
+      case "windows":
         info('Target Platform: Windows');
-      case Platform.MAC:
+      case "mac":
         info('Target Platform: MacOS');
-      case Platform.LINUX:
+      case "linux":
         info('Target Platform: Linux');
-      case Platform.ANDROID:
+      case "android":
         info('Target Platform: Android');
-      case Platform.IOS:
+      case "ios":
         info('Target Platform: IOS');
-      case Platform.HTML5:
+      case "html5":
         info('Target Platform: HTML5');
-      case Platform.SWITCH:
+      case "switch":
         info('Target Platform: Nintendo Switch');
       // See lime.tools.Platform for a full list.
       // case Platform.EMSCRITEN: // A WebAssembly build might be interesting...
@@ -1773,7 +1775,9 @@ class Project extends HXProject
 
   public function isSwitch():Bool
   {
-    return this.target == Platform.SWITCH;
+    // Desktop Lime has no Platform.SWITCH enum member. Compare the platform's
+    // underlying string so this HXP remains compilable with both Lime variants.
+    return Std.string(this.target).toLowerCase() == "switch";
   }
 
   public function isIOSSimulator():Bool
