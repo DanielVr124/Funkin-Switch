@@ -57,8 +57,13 @@ def symbols_from_nm(output: str, prefix: str) -> set[str]:
     found = set()
     for line in output.splitlines():
         fields = line.split()
-        if fields and fields[-1].startswith(prefix):
-            found.add(fields[-1])
+        # GNU nm prints archive member headings such as "SDL_audio.o:".
+        # Those are not symbol records and must not be mistaken for SDL APIs.
+        if len(fields) < 2 or fields[-1].endswith(":"):
+            continue
+        symbol = fields[-1]
+        if symbol.startswith(prefix):
+            found.add(symbol)
     return found
 
 
