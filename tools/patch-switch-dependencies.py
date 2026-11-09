@@ -4,6 +4,7 @@
 These edits are applied to the checked-out Haxelib dependencies in the CI
 workspace. They do not modify the upstream desktop dependency set.
 """
+import os
 from pathlib import Path
 
 
@@ -94,11 +95,21 @@ replace_once(
 )
 
 # libmpv is packaged with SDL2 video, audio, and gamepad backends enabled.
-# Lime's Switch NRO template currently links SDL3 but omits SDL2, leaving the
-# references from libmpv.a unresolved during the final application link.
-# The generated Makefile exports LIBPATHS to devkitPro's switch_rules
-# linker recipe. Adding the portlibs path to LDFLAGS alone is ineffective:
-# switch_rules constructs the link command from LIBPATHS.
+# Lime's Switch NRO template links SDL3 but must also link MPV's SDL2 archive.
+# Resolve the installed archives now and use absolute paths in LIBS. This avoids
+# relying on LIBPATHS surviving Lime's nested Make invocation.
+devkitpro = Path(os.environ.get("DEVKITPRO", "/opt/devkitpro"))
+switch_libdir = devkitpro / "portlibs" / "switch" / "lib"
+mpv_archive = switch_libdir / "libmpv.a"
+sdl2_archive = switch_libdir / "libSDL2.a"
+for archive in (mpv_archive, sdl2_archive):
+    if not archive.is_file():
+        raise SystemExit(
+            f"Required Switch static library is missing: {archive}. "
+            "Check the installed switch-libmpv and switch-sdl2 packages."
+        )
+    print(f"Verified Switch linker input: {archive} ({archive.stat().st_size} bytes)")
+
 switch_makefile = root / ".haxelib/lime/git/templates/switch/MakeFileNRO"
 replace_once(
     switch_makefile,
@@ -108,7 +119,13 @@ replace_once(
 )
 replace_once(
     switch_makefile,
-    "        -lvorbisfile -lcurl -lvorbis -logg -lSDL3 -lharfbuzz \\\n",
-    "        -lvorbisfile -lcurl -lvorbis -logg -lSDL3 -lSDL2 -lharfbuzz \\\n",
-    "Lime Switch SDL2 link required by MPV",
+    "        -lmpv -lplacebo",
+    f"        {mpv_archive} -lplacebo",
+    "Lime Switch MPV absolute archive link",
+)
+replace_once(
+    switch_makefile,
+    "-lSDL3 -lSDL2 -lharfbuzz",
+    f"-lSDL3 {sdl2_archive} -lharfbuzz",
+    "Lime Switch SDL2 absolute archive link required by MPV",
 )
