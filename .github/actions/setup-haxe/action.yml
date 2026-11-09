@@ -20,6 +20,11 @@ inputs:
   gh-token:
     description: 'GitHub secret for private repos as dependencies'
 
+outputs:
+  haxelib-cache-hit:
+    description: "Whether the Haxe dependency cache was restored with an exact key."
+    value: ${{ steps.cache-hmm.outputs.cache-hit }}
+
 runs:
   using: "composite"
   steps:
@@ -71,7 +76,7 @@ runs:
 
   - name: Restore cached dependencies
     id: cache-hmm
-    uses: actions/cache@v5
+    uses: actions/cache/restore@v5
     with:
       path: .haxelib
       key: haxe-hmm-${{ runner.os }}-${{ hashFiles('**/hmm.json') }}

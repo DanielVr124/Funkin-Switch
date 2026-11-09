@@ -95,6 +95,8 @@ class FunkinPreloader extends FlxBasePreloader
   var progressBarPieces:Array<Sprite>;
   var progressLeftText:TextField;
   var progressRightText:TextField;
+
+
   var dspText:TextField;
   var fnfText:TextField;
   var enhancedText:TextField;

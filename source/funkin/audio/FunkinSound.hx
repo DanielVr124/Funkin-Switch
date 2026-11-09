@@ -449,11 +449,14 @@ class FunkinSound extends FlxSound implements ICloneable<FunkinSound>
       sound._label = 'unknown';
     }
 
+    // Set this before autoPlay so important sounds use the channel path that
+    // bypasses OpenFL's active-channel limit from their very first frame.
+    sound.important = important;
+
     if (autoPlay) sound.play();
     sound.volume = volume;
     FlxG.sound.defaultSoundGroup.add(sound);
     sound.persist = persist;
-    sound.important = important;
 
     // Make sure to add the sound to the list.
     // If it's already in, it won't get re-added.

@@ -69,7 +69,10 @@ import funkin.util.SerializerUtil;
 import funkin.util.HapticUtil;
 import funkin.util.GRhythmUtil;
 import haxe.Int64;
-#if mobile
+#if switch
+import nx.NXMain;
+#end
+#if (mobile || FEATURE_TOUCH_CONTROLS)
 import funkin.util.TouchUtil;
 import funkin.mobile.ui.FunkinHitbox;
 import funkin.mobile.input.ControlsHandler;
@@ -637,6 +640,24 @@ class PlayState extends MusicBeatSubState
 
   public var isSongEnd:Bool = false;
 
+  #if switch
+  var hasSeenConnectedSwitchController:Bool = false;
+  var switchDisconnectPauseOpen:Bool = false;
+
+  static final SWITCH_AUDIO_STOP_GRACE_PERIOD:Float = 0.20;
+  static final SWITCH_AUDIO_STALL_GRACE_PERIOD:Float = 0.75;
+  static final SWITCH_AUDIO_POSITION_EPSILON_MS:Float = 1.0;
+  static final SWITCH_AUDIO_STABLE_RESET_TIME:Float = 3.0;
+  static final SWITCH_AUDIO_MAX_RECOVERY_ATTEMPTS:Int = 2;
+
+  var switchAudioWasPlaying:Bool = false;
+  var switchAudioStoppedTimer:Float = 0.0;
+  var switchAudioStableTimer:Float = 0.0;
+  var switchAudioRecoveryAttempts:Int = 0;
+  var switchAudioLastPosition:Float = -1.0;
+  var switchAudioNoProgressTimer:Float = 0.0;
+  #end
+
   #if mobile
   /**
    * The pause button for the game, only appears in Mobile targets.
@@ -823,6 +844,37 @@ class PlayState extends MusicBeatSubState
     // Don't do anything else here! Wait until create() when we attach to the camera.
   }
 
+  #if FEATURE_TOUCH_CONTROLS
+  /**
+   * Whether the on-screen note controls should be active for this build.
+   */
+  inline function shouldUseTouchControls():Bool
+  {
+    #if switch
+    return Preferences.switchTouchControlsEnabled;
+    #elseif mobile
+    return !ControlsHandler.hasExternalInputDevice;
+    #else
+    return true;
+    #end
+  }
+
+  /**
+   * Resolve the selected on-screen control scheme without changing the
+   * existing mobile preference or the physical Switch controller layout.
+   */
+  inline function getTouchControlsScheme():String
+  {
+    #if switch
+    return Preferences.switchTouchControlsScheme;
+    #elseif mobile
+    return Preferences.controlsScheme;
+    #else
+    return FunkinHitboxControlSchemes.Arrows;
+    #end
+  }
+  #end
+
   /**
    * Called when the PlayState is switched to.
    */
@@ -897,16 +949,16 @@ class PlayState extends MusicBeatSubState
     initStrumlines();
     initPopups();
 
-    #if mobile
-    if (!ControlsHandler.hasExternalInputDevice)
+    #if FEATURE_TOUCH_CONTROLS
+    if (shouldUseTouchControls())
     {
-      // Initialize the hitbox for mobile controls
-      addHitbox(false);
+      // Reuse the original FNF mobile hitbox and input actions.
+      addHitbox(false, true, getTouchControlsScheme());
       if (hitbox != null)
       {
         hitbox.isPixel = currentChart.noteStyle == 'pixel';
 
-        if (Preferences.controlsScheme == FunkinHitboxControlSchemes.Arrows)
+        if (getTouchControlsScheme() == FunkinHitboxControlSchemes.Arrows)
         {
           for (direction in Strumline.DIRECTIONS)
           {
@@ -915,13 +967,15 @@ class PlayState extends MusicBeatSubState
         }
       }
     }
+    #if mobile
     else
     {
-      // The camera is still needed for the pause button!
+      // The camera is still needed for the mobile pause button when a gamepad is connected.
       camControls = new FunkinCamera('camControls');
       FlxG.cameras.add(camControls, false);
       camControls.bgColor = 0x0;
     }
+    #end
     #end
 
     #if FEATURE_DISCORD_RPC
@@ -1034,6 +1088,31 @@ class PlayState extends MusicBeatSubState
 
     super.update(elapsed);
 
+    #if switch
+    if (Preferences.switchAutoPauseOnDisconnect && NXMain.nxController != null)
+    {
+      if (NXMain.nxController.isConnected)
+      {
+        hasSeenConnectedSwitchController = true;
+        switchDisconnectPauseOpen = false;
+      }
+      else if (hasSeenConnectedSwitchController && !switchDisconnectPauseOpen
+        && !isPlayerDying && !isSongEnd && !isInCutscene && subState == null)
+      {
+        // Pause immediately if the controller disappears or a paired Joy-Con
+        // falls back to a single side, so the player does not accrue missed notes.
+        pause(Standard, false, true);
+        if (isGamePaused)
+        {
+          switchDisconnectPauseOpen = true;
+          return;
+        }
+      }
+    }
+
+    if (updateSwitchAudioRecovery(elapsed)) return;
+    #end
+
     updateHealthBar();
     updateScoreText();
 
@@ -1062,6 +1141,26 @@ class PlayState extends MusicBeatSubState
       startingSong = true;
       isPlayerDying = false;
 
+      // A Switch retry must discard the old native audio channels entirely.
+      // Merely pausing and seeking a channel that has stopped unexpectedly can
+      // leave the next attempt in the same broken audio state.
+      #if switch
+      resetSwitchAudioRecoveryState();
+
+      if (!overrideMusic)
+      {
+        // Normal song playback owns these channels, so force a clean reload.
+        disposeSwitchSongAudio();
+        vocals = currentChart?.buildVocals(currentInstrumental);
+      }
+      else if (FlxG.sound.music != null)
+      {
+        // Chart editor / externally supplied music remains owned by its caller.
+        FlxG.sound.music.pause();
+        FlxG.sound.music.time = startTimestamp;
+        FlxG.sound.music.pitch = playbackRate;
+      }
+      #else
       // Reset music properly.
       if (FlxG.sound.music != null)
       {
@@ -1081,6 +1180,7 @@ class PlayState extends MusicBeatSubState
           trace('WARNING: No vocals found for this song.');
         }
       }
+      #end
 
       if (FlxG.sound.music != null) FlxG.sound.music.volume = instrumentalVolume;
 
@@ -1208,6 +1308,9 @@ class PlayState extends MusicBeatSubState
       tweenPauseButtonIn();
       if (!startingSong && hitbox != null) hitbox.visible = true;
     }
+    #end
+    #if (switch && FEATURE_TOUCH_CONTROLS)
+    if (justUnpaused && shouldUseTouchControls() && !startingSong && hitbox != null) hitbox.visible = true;
     #end
 
     // Cap health.
@@ -1347,7 +1450,7 @@ class PlayState extends MusicBeatSubState
      * @param mode Which set of pause menu options to display (distinguishes between standard, charting, and cutscene)
      * @param lostFocus Whether the game paused because the window lost focus
      */
-  function pause(mode:PauseMode = Standard, lostFocus:Bool = false):Void
+  function pause(mode:PauseMode = Standard, lostFocus:Bool = false, controllerDisconnected:Bool = false, audioInterrupted:Bool = false):Void
   {
     if (!mayPauseGame || justUnpaused || isGamePaused || isPlayerDying || isSongEnd) return;
 
@@ -1398,7 +1501,7 @@ class PlayState extends MusicBeatSubState
               boyfriendPos = currentStage.getBoyfriend().getScreenPosition();
             }
 
-            openPauseSubState(isChartingMode ? Charting : Standard, camPause, lostFocus);
+            openPauseSubState(isChartingMode ? Charting : Standard, camPause, lostFocus, null, controllerDisconnected, audioInterrupted);
           }
 
           #if FEATURE_DISCORD_RPC
@@ -1422,11 +1525,20 @@ class PlayState extends MusicBeatSubState
     pauseCircle.alpha = 0;
     if (hitbox != null) hitbox.visible = false;
     #end
+    #if (switch && FEATURE_TOUCH_CONTROLS)
+    if (hitbox != null) hitbox.visible = false;
+    #end
   }
 
-  function openPauseSubState(mode:PauseMode, cam:FlxCamera, lostFocus:Bool = false, ?onPause:Void->Void):Void
+  function openPauseSubState(mode:PauseMode, cam:FlxCamera, lostFocus:Bool = false, ?onPause:Void->Void, controllerDisconnected:Bool = false,
+      audioInterrupted:Bool = false):Void
   {
-    final pauseSubState = new PauseSubState({mode: mode, lostFocus: lostFocus}, onPause);
+    final pauseSubState = new PauseSubState({
+      mode: mode,
+      lostFocus: lostFocus,
+      controllerDisconnected: controllerDisconnected,
+      audioInterrupted: audioInterrupted
+    }, onPause);
     FlxTransitionableState.skipNextTransIn = true;
     FlxTransitionableState.skipNextTransOut = true;
     pauseSubState.camera = cam;
@@ -1988,8 +2100,7 @@ class PlayState extends MusicBeatSubState
      */
   function initHealthBar():Void
   {
-    final isDownscroll:Bool = #if mobile (Preferences.controlsScheme == FunkinHitboxControlSchemes.Arrows
-      && !ControlsHandler.hasExternalInputDevice)
+    final isDownscroll:Bool = #if FEATURE_TOUCH_CONTROLS (shouldUseTouchControls() && getTouchControlsScheme() == FunkinHitboxControlSchemes.Arrows)
       || #end Preferences.downscroll;
 
     var healthBarYPos:Float = isDownscroll ? FlxG.height * 0.1 : FlxG.height * 0.9;
@@ -2028,8 +2139,7 @@ class PlayState extends MusicBeatSubState
     // Create subtitles if they are enabled.
     if (Preferences.subtitles)
     {
-      final isDownscroll:Bool = #if mobile (Preferences.controlsScheme == FunkinHitboxControlSchemes.Arrows
-        && !ControlsHandler.hasExternalInputDevice)
+      final isDownscroll:Bool = #if FEATURE_TOUCH_CONTROLS (shouldUseTouchControls() && getTouchControlsScheme() == FunkinHitboxControlSchemes.Arrows)
         || #end Preferences.downscroll;
 
       final subtitlesAlignment:SubtitlesAlignment = isDownscroll ? SubtitlesAlignment.SUBTITLES_TOP : SubtitlesAlignment.SUBTITLES_BOTTOM;
@@ -2263,8 +2373,8 @@ class PlayState extends MusicBeatSubState
     opponentStrumline.zIndex = 1000;
     opponentStrumline.cameras = [camHUD];
 
-    #if mobile
-    if (Preferences.controlsScheme == FunkinHitboxControlSchemes.Arrows && !ControlsHandler.hasExternalInputDevice)
+    #if FEATURE_TOUCH_CONTROLS
+    if (shouldUseTouchControls() && getTouchControlsScheme() == FunkinHitboxControlSchemes.Arrows)
     {
       initNoteHitbox();
     }
@@ -2277,7 +2387,7 @@ class PlayState extends MusicBeatSubState
   /**
      * Configures the position of strumline for the default control scheme
      */
-  #if mobile
+  #if FEATURE_TOUCH_CONTROLS
   function initNoteHitbox()
   {
     final amplification:Float = (FlxG.width / FlxG.height) / (FlxG.initialWidth / FlxG.initialHeight);
@@ -2306,7 +2416,9 @@ class PlayState extends MusicBeatSubState
     opponentStrumline.y = Constants.STRUMLINE_Y_OFFSET * 0.3;
     opponentStrumline.x -= 30;
   }
+  #end
 
+  #if mobile
   function initPauseSprites()
   {
     pauseButton.animation.addByIndices('idle', 'back', [0], '', 24, false);
@@ -2635,8 +2747,8 @@ class PlayState extends MusicBeatSubState
   {
     startingSong = false;
 
-    #if mobile
-    if (hitbox != null) hitbox.visible = true;
+    #if FEATURE_TOUCH_CONTROLS
+    if (shouldUseTouchControls() && hitbox != null) hitbox.visible = true;
     #end
 
     if (!overrideMusic && !isGamePaused && currentChart != null)
@@ -2647,6 +2759,10 @@ class PlayState extends MusicBeatSubState
     if (FlxG.sound.music == null)
     {
       FlxG.log.error('PlayState failed to initialize instrumental!');
+      #if switch
+      // Mark audio as expected so the recovery monitor can retry the load.
+      switchAudioWasPlaying = true;
+      #end
       return;
     }
 
@@ -2690,6 +2806,17 @@ class PlayState extends MusicBeatSubState
     }
 
     FlxG.sound.music.play();
+
+    #if switch
+    // Track the expected playback state even if the native channel fails
+    // before the next gameplay update can observe it playing.
+    switchAudioWasPlaying = true;
+    switchAudioStoppedTimer = 0;
+    switchAudioStableTimer = 0;
+    switchAudioRecoveryAttempts = 0;
+    switchAudioLastPosition = FlxG.sound.music.time;
+    switchAudioNoProgressTimer = 0;
+    #end
 
     #if FEATURE_DISCORD_RPC
     // Updating Discord Rich Presence (with Time Left)
@@ -2741,6 +2868,196 @@ class PlayState extends MusicBeatSubState
     vocals.time = timeToPlayAt;
     vocals.play(false, timeToPlayAt);
   }
+
+  #if switch
+  /**
+   * Watches for an instrumental channel that unexpectedly stops during gameplay.
+   * The Conductor follows the music clock, so a stopped channel would otherwise
+   * stop note movement and beat processing as well.
+   *
+   * @return True when recovery has opened a pause substate and the frame should stop.
+   */
+  function updateSwitchAudioRecovery(elapsed:Float):Bool
+  {
+    // These states intentionally stop or replace gameplay audio.
+    if (overrideMusic || startingSong || needsReset || isPlayerDying || isSongEnd || isInCutscene || subState != null)
+    {
+      switchAudioStoppedTimer = 0;
+      switchAudioStableTimer = 0;
+      switchAudioNoProgressTimer = 0;
+      switchAudioLastPosition = -1.0;
+
+      if (startingSong || needsReset || isPlayerDying || isSongEnd)
+      {
+        switchAudioWasPlaying = false;
+      }
+      return false;
+    }
+
+    if (currentChart == null) return false;
+
+    final music = FlxG.sound.music;
+    var audioStopped:Bool = music == null || !music.playing;
+    var audioClockStalled:Bool = false;
+
+    if (!audioStopped && music != null)
+    {
+      // A native channel can remain marked as playing even after its playback
+      // clock stops. The conductor follows this clock, so a stalled clock also
+      // freezes notes. Watch position progress instead of trusting playing alone.
+      final currentPosition:Float = music.time;
+      if (switchAudioLastPosition < 0
+        || Math.abs(currentPosition - switchAudioLastPosition) >= SWITCH_AUDIO_POSITION_EPSILON_MS)
+      {
+        switchAudioLastPosition = currentPosition;
+        switchAudioNoProgressTimer = 0;
+      }
+      else
+      {
+        switchAudioNoProgressTimer += Math.max(0, elapsed);
+      }
+
+      audioClockStalled = switchAudioNoProgressTimer >= SWITCH_AUDIO_STALL_GRACE_PERIOD;
+      if (!audioClockStalled)
+      {
+        switchAudioWasPlaying = true;
+        switchAudioStoppedTimer = 0;
+        switchAudioStableTimer += elapsed;
+
+        // Only clear the retry count after the audio clock has remained healthy.
+        if (switchAudioStableTimer >= SWITCH_AUDIO_STABLE_RESET_TIME)
+        {
+          switchAudioRecoveryAttempts = 0;
+        }
+        return false;
+      }
+    }
+
+    if (!switchAudioWasPlaying) return false;
+
+    switchAudioStableTimer = 0;
+    if (audioClockStalled)
+    {
+      trace('SWITCH AUDIO: Instrumental channel is marked playing, but its playback clock stopped at ${switchAudioLastPosition} ms.');
+      switchAudioStoppedTimer = SWITCH_AUDIO_STOP_GRACE_PERIOD;
+    }
+    else
+    {
+      switchAudioLastPosition = -1.0;
+      switchAudioNoProgressTimer = 0;
+      switchAudioStoppedTimer += Math.max(0, elapsed);
+    }
+
+    if (switchAudioStoppedTimer < SWITCH_AUDIO_STOP_GRACE_PERIOD) return false;
+
+    switchAudioStoppedTimer = 0;
+    switchAudioLastPosition = -1.0;
+    switchAudioNoProgressTimer = 0;
+
+    if (switchAudioRecoveryAttempts < SWITCH_AUDIO_MAX_RECOVERY_ATTEMPTS)
+    {
+      switchAudioRecoveryAttempts++;
+
+      if (recoverSwitchSongAudio())
+      {
+        trace('SWITCH AUDIO: Recovered the instrumental and vocals at the current song position (attempt ${switchAudioRecoveryAttempts}).');
+        switchAudioStableTimer = 0;
+        return false;
+      }
+
+      trace('SWITCH AUDIO: Recovery attempt ${switchAudioRecoveryAttempts} failed.');
+      return false;
+    }
+
+    trace('SWITCH AUDIO: Audio could not be recovered. Opening the pause menu.');
+    pause(Standard, false, false, true);
+    return isGamePaused;
+  }
+
+  /**
+   * Stop and destroy the current Switch song channels so they cannot leak into
+   * a retry or recovery attempt.
+   */
+  function disposeSwitchSongAudio():Void
+  {
+    if (FlxG.sound.music != null)
+    {
+      final oldMusic = FlxG.sound.music;
+      oldMusic.stop();
+      oldMusic.destroy();
+    }
+
+    if (vocals != null)
+    {
+      final oldVocals = vocals;
+      remove(oldVocals, true);
+      oldVocals.destroy();
+      vocals = null;
+    }
+  }
+
+  /**
+   * Reset the recovery monitor when a fresh song attempt begins.
+   */
+  function resetSwitchAudioRecoveryState():Void
+  {
+    switchAudioWasPlaying = false;
+    switchAudioStoppedTimer = 0;
+    switchAudioStableTimer = 0;
+    switchAudioRecoveryAttempts = 0;
+    switchAudioLastPosition = -1.0;
+    switchAudioNoProgressTimer = 0;
+  }
+
+  /**
+   * Recreate the Switch instrumental and vocal channels at the last known
+   * Conductor position. The chart and note state are deliberately left intact.
+   */
+  function recoverSwitchSongAudio():Bool
+  {
+    final chart = currentChart;
+    if (chart == null) return false;
+
+    disposeSwitchSongAudio();
+
+    // Use the existing channel-only recovery path. Do not close/recreate the
+    // Switch audio device from the frame update loop: native device teardown can
+    // block the main thread when the driver has already stalled.
+
+    chart.playInst(1.0, currentInstrumental, false);
+
+    final recoveredMusic = FlxG.sound.music;
+    if (recoveredMusic == null || recoveredMusic.length <= 0) return false;
+
+    recoveredMusic.onComplete = function()
+    {
+      if (mayPauseGame) endSong(skipEndingTransition);
+    };
+    recoveredMusic.pause();
+    recoveredMusic.pitch = playbackRate;
+    recoveredMusic.volume = instrumentalVolume;
+
+    final minimumPosition:Float = Math.min(Conductor.instance.combinedOffset, 0);
+    final timeToPlayAt:Float = Math.max(0, Math.min(recoveredMusic.length - 1,
+      Math.max(minimumPosition, Conductor.instance.songPosition) - Conductor.instance.combinedOffset));
+
+    recoveredMusic.time = timeToPlayAt;
+    recoveredMusic.play(false, timeToPlayAt);
+    switchAudioLastPosition = recoveredMusic.time;
+    switchAudioNoProgressTimer = 0;
+
+    final rebuiltVocals = chart.buildVocals(currentInstrumental);
+    vocals = rebuiltVocals;
+    rebuiltVocals.pitch = playbackRate;
+    rebuiltVocals.playerVolume = playerVocalsVolume;
+    rebuiltVocals.opponentVolume = opponentVocalsVolume;
+    add(rebuiltVocals);
+    rebuiltVocals.time = timeToPlayAt;
+    rebuiltVocals.play(false, timeToPlayAt);
+
+    return recoveredMusic.playing;
+  }
+  #end
 
   /**
      * Updates the position and contents of the score display.
@@ -3403,7 +3720,7 @@ class PlayState extends MusicBeatSubState
     if (currentConversation != null)
     {
       // Pause/unpause may conflict with advancing the conversation!
-      if ((controls.CUTSCENE_ADVANCE #if mobile || (!pauseButtonCheck && TouchUtil.justPressed) #end) && !justUnpaused)
+      if ((controls.CUTSCENE_ADVANCE #if (mobile || (switch && FEATURE_TOUCH_CONTROLS)) || (!pauseButtonCheck && TouchUtil.justPressed) #end) && !justUnpaused)
       {
         currentConversation.advanceConversation();
       }
@@ -3452,6 +3769,9 @@ class PlayState extends MusicBeatSubState
     if (hitbox != null) hitbox.visible = false;
     pauseButton.visible = false;
     pauseCircle.visible = false;
+    #end
+    #if (switch && FEATURE_TOUCH_CONTROLS)
+    if (hitbox != null) hitbox.visible = false;
     #end
 
     // Check if any events want to prevent the song from ending.

@@ -333,43 +333,133 @@ class Preferences
    * If enabled, the game will utilize VSync (or adaptive VSync) on startup.
    * @default `OFF`
    */
-  public static var vsyncMode(get, set):funkin.util.WindowVSyncMode;
+  public static var vsyncMode(get, set):lime.ui.WindowVSyncMode;
 
-  static function get_vsyncMode():funkin.util.WindowVSyncMode
+  static function get_vsyncMode():lime.ui.WindowVSyncMode
   {
     #if (mobile || web)
-    return funkin.util.WindowVSyncMode.OFF;
+    return lime.ui.WindowVSyncMode.OFF;
     #else
     var value = Save?.instance?.options?.vsyncMode ?? 'Off';
 
     return switch (value)
     {
       case 'Off':
-        funkin.util.WindowVSyncMode.OFF;
+        lime.ui.WindowVSyncMode.OFF;
       case 'On':
-        funkin.util.WindowVSyncMode.ON;
+        lime.ui.WindowVSyncMode.ON;
       case 'Adaptive':
-        funkin.util.WindowVSyncMode.ADAPTIVE;
+        lime.ui.WindowVSyncMode.ADAPTIVE;
       default:
-        funkin.util.WindowVSyncMode.OFF;
+        lime.ui.WindowVSyncMode.OFF;
     };
     #end
   }
 
-  static function set_vsyncMode(value:funkin.util.WindowVSyncMode):funkin.util.WindowVSyncMode
+  #if switch
+  /**
+   * The Switch-specific group of physical buttons used for gameplay note input.
+   * @default `Hybrid`
+   */
+  public static var switchNoteInputLayout(get, set):String;
+
+  static function get_switchNoteInputLayout():String
+  {
+    return Save?.instance?.options?.switchNoteInputLayout ?? 'Hybrid';
+  }
+
+  static function set_switchNoteInputLayout(value:String):String
+  {
+    final validLayouts:Array<String> = ['Hybrid', 'DPad', 'FaceButtons', 'Shoulders'];
+    final normalized:String = validLayouts.contains(value) ? value : 'Hybrid';
+
+    var save:Save = Save.instance;
+    save.options.switchNoteInputLayout = normalized;
+    Save.system.flush();
+    return normalized;
+  }
+
+  /**
+   * Whether the original FNF touchscreen note controls are enabled on Switch.
+   * @default `false`
+   */
+  public static var switchTouchControlsEnabled(get, set):Bool;
+
+  static function get_switchTouchControlsEnabled():Bool
+  {
+    return Save?.instance?.options?.switchTouchControlsEnabled ?? false;
+  }
+
+  static function set_switchTouchControlsEnabled(value:Bool):Bool
+  {
+    var save:Save = Save.instance;
+    save.options.switchTouchControlsEnabled = value;
+    Save.system.flush();
+    return value;
+  }
+
+  /**
+   * Which of the original FNF touchscreen layouts is used on Switch.
+   * @default `Arrows`
+   */
+  public static var switchTouchControlsScheme(get, set):String;
+
+  static function get_switchTouchControlsScheme():String
+  {
+    return Save?.instance?.options?.switchTouchControlsScheme ?? 'Arrows';
+  }
+
+  static function set_switchTouchControlsScheme(value:String):String
+  {
+    final validLayouts:Array<String> = [
+      'Arrows',
+      'Four Lanes',
+      'Double Thumb Triangle',
+      'Double Thumb Square',
+      'Double Thumb DPad'
+    ];
+    final normalized:String = validLayouts.contains(value) ? value : 'Arrows';
+
+    var save:Save = Save.instance;
+    save.options.switchTouchControlsScheme = normalized;
+    Save.system.flush();
+    return normalized;
+  }
+
+  /**
+   * Automatically pause a song when the complete Switch controller disconnects.
+   * @default `true`
+   */
+  public static var switchAutoPauseOnDisconnect(get, set):Bool;
+
+  static function get_switchAutoPauseOnDisconnect():Bool
+  {
+    return Save?.instance?.options?.switchAutoPauseOnDisconnect ?? true;
+  }
+
+  static function set_switchAutoPauseOnDisconnect(value:Bool):Bool
+  {
+    var save:Save = Save.instance;
+    save.options.switchAutoPauseOnDisconnect = value;
+    Save.system.flush();
+    return value;
+  }
+  #end
+
+  static function set_vsyncMode(value:lime.ui.WindowVSyncMode):lime.ui.WindowVSyncMode
   {
     #if (mobile || web)
-    return funkin.util.WindowVSyncMode.OFF;
+    return lime.ui.WindowVSyncMode.OFF;
     #else
     var string;
 
     switch (value)
     {
-      case funkin.util.WindowVSyncMode.OFF:
+      case lime.ui.WindowVSyncMode.OFF:
         string = 'Off';
-      case funkin.util.WindowVSyncMode.ON:
+      case lime.ui.WindowVSyncMode.ON:
         string = 'On';
-      case funkin.util.WindowVSyncMode.ADAPTIVE:
+      case lime.ui.WindowVSyncMode.ADAPTIVE:
         string = 'Adaptive';
       default:
         string = 'Off';

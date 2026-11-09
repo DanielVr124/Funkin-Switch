@@ -1,35 +1,6 @@
 name: Build Windows and Nintendo Switch
 
 on:
-  push:
-    branches:
-      - switch-port-dev
-    paths:
-      - 'source/**'
-      - 'tools/patch-switch-dependencies.py'
-      - 'project.hxp'
-      - 'hmm.json'
-      - 'hmm-switch.json'
-      - '.gitmodules'
-      - 'assets/**'
-      - 'art/**'
-      - 'templates/**'
-      - '.github/actions/setup-haxe/**'
-      - '.github/workflows/build-platforms.yml'
-  pull_request:
-    branches:
-      - switch-port-dev
-    paths:
-      - 'source/**'
-      - 'project.hxp'
-      - 'hmm.json'
-      - 'hmm-switch.json'
-      - '.gitmodules'
-      - 'assets/**'
-      - 'art/**'
-      - 'templates/**'
-      - '.github/actions/setup-haxe/**'
-      - '.github/workflows/build-platforms.yml'
   workflow_dispatch:
 
 permissions:

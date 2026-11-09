@@ -291,8 +291,14 @@ class FunkinHitbox extends FlxTypedSpriteGroup<FunkinHint>
     final hintsColors:Array<FlxColor> = (colorsOverride == null || colorsOverride.length == 0) ? [0xFFC34B9A, 0xFF00FFFF, 0xFF12FB06, 0xFFF9393F] : colorsOverride;
     final hintsNoteDirections:Array<NoteDirection> = (directionsOverride == null || directionsOverride.length == 0) ? [NoteDirection.LEFT, NoteDirection.DOWN, NoteDirection.UP, NoteDirection.RIGHT] : directionsOverride;
 
-    #if mobile
-    final controlsScheme:String = (schemeOverride == null || schemeOverride.length == 0) ? Preferences.controlsScheme : schemeOverride;
+    #if (mobile || FEATURE_TOUCH_CONTROLS)
+    var controlsScheme:String = FunkinHitboxControlSchemes.Arrows;
+    #if switch
+    controlsScheme = Preferences.switchTouchControlsScheme;
+    #elseif mobile
+    controlsScheme = Preferences.controlsScheme;
+    #end
+    if (schemeOverride != null && schemeOverride.length > 0) controlsScheme = schemeOverride;
 
     switch (controlsScheme)
     {

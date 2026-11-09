@@ -20,9 +20,11 @@ import funkin.input.Controls;
 #if FEATURE_NEWGROUNDS
 import funkin.api.newgrounds.NewgroundsClient;
 #end
+#if FEATURE_TOUCH_CONTROLS
+import funkin.mobile.ui.FunkinBackButton;
+#end
 #if mobile
 import funkin.util.TouchUtil;
-import funkin.mobile.ui.FunkinBackButton;
 import funkin.mobile.input.ControlsHandler;
 import funkin.mobile.ui.options.ControlsSchemeMenu;
 #end
@@ -76,6 +78,10 @@ class OptionsState extends MusicBeatState
     var offsets:OffsetMenu = optionsCodex.addPage(Offsets, new OffsetMenu());
     #end
     var saveData:SaveDataMenu = optionsCodex.addPage(SaveData, new SaveDataMenu());
+    #if switch
+    var switchSettings:SwitchSettingsMenu = optionsCodex.addPage(SwitchSettings, new SwitchSettingsMenu());
+    var switchControllerTest:SwitchControllerTestMenu = optionsCodex.addPage(SwitchControllerTest, new SwitchControllerTestMenu());
+    #end
 
     options.addSaveDataOptionsItem(saveData);
     options.addExitItem();
@@ -89,6 +95,10 @@ class OptionsState extends MusicBeatState
       offsets.onExit.add(exitOffsets);
       #end
       saveData.onExit.add(optionsCodex.switchPage.bind(Options));
+      #if switch
+      switchSettings.onExit.add(optionsCodex.switchPage.bind(Options));
+      switchControllerTest.onExit.add(optionsCodex.switchPage.bind(SwitchSettings));
+      #end
     }
     else
     {
@@ -170,6 +180,9 @@ class OptionsMenu extends Page<OptionsMenuPageName>
     add(items = new TextMenuList());
 
     createItem('PREFERENCES', function() codex.switchPage(Preferences));
+    #if switch
+    createItem('SWITCH SETTINGS', function() codex.switchPage(SwitchSettings));
+    #end
     #if mobile
     if (ControlsHandler.hasExternalInputDevice)
     #end
@@ -356,4 +369,8 @@ enum abstract OptionsMenuPageName(String) to PageName
   public var Preferences = 'preferences';
   public var Offsets = 'offsets';
   public var SaveData = 'saveData';
+  #if switch
+  public var SwitchSettings = 'switchSettings';
+  public var SwitchControllerTest = 'switchControllerTest';
+  #end
 }

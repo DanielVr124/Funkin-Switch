@@ -1,6 +1,22 @@
 package;
 
 #if !macro
+// Nintendo Switch imports
+#if switch
+import switchLib.Result;
+import switchLib.Types.ResultType;
+import switchLib.runtime.Pad;
+import switchLib.services.Hid;
+import switchLib.arm.Counter;
+import switchLib.services.Applet;
+import nx.NXMain;
+import nx.NXGame;
+import nx.NXSimpleWeb;
+import nx.controls.NXController;
+import nx.controls.NXControlButton;
+import nx.controls.NXVibrationHD;
+#end
+
 // Only import these when we aren't in a macro.
 import funkin.util.Constants;
 import funkin.Assets;

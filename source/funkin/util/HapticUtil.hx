@@ -1,8 +1,15 @@
 package funkin.util;
 
 import flixel.tweens.FlxTween;
+
 #if FEATURE_HAPTICS
+#if switch
+import nx.NXMain;
+import nx.controls.NXControlButton.NXJoyCon;
+import nx.controls.NXVibrationHD.NXVibrationData;
+#else
 import extension.haptics.Haptic;
+#end
 #end
 
 /**
@@ -33,9 +40,7 @@ class HapticUtil
    * @param amplitude The intensity of the vibration (0.0 to 1.0).
    * @param sharpness Controls the feel of vibration.
    */
-  public static function vibrate(period:Float = Constants.DEFAULT_VIBRATION_PERIOD, duration:Float = Constants.DEFAULT_VIBRATION_DURATION,
-      amplitude:Float = Constants.DEFAULT_VIBRATION_AMPLITUDE, sharpness:Float = Constants.DEFAULT_VIBRATION_SHARPNESS,
-      ?targetHapticsModes:Array<HapticsMode>):Void
+  public static function vibrate(period:Float = Constants.DEFAULT_VIBRATION_PERIOD, duration:Float = Constants.DEFAULT_VIBRATION_DURATION, amplitude:Float = Constants.DEFAULT_VIBRATION_AMPLITUDE, sharpness:Float = Constants.DEFAULT_VIBRATION_SHARPNESS, ?targetHapticsModes:Array<HapticsMode>):Void
   {
     #if FEATURE_HAPTICS
     if (!HapticUtil.hapticsAvailable) return;
@@ -45,6 +50,21 @@ class HapticUtil
 
     final amplitudeValue = (amplitude * Preferences.hapticsIntensityMultiplier).clamp(0, Constants.MAX_VIBRATION_AMPLITUDE);
 
+    #if switch
+    if (NXMain.nxController != null && NXMain.nxController.vibration != null)
+    {
+      var nxVibeData:NXVibrationData = {
+        joycon: NXJoyCon.LEFT,
+        duration: duration,
+        amplitude_low: amplitudeValue,
+        frequency_low: 160.0,
+        amplitude_high: (amplitudeValue * sharpness).clamp(0, Constants.MAX_VIBRATION_AMPLITUDE),
+        frequency_high: 320.0
+      };
+
+      NXMain.nxController.vibration.vibrateBoth(nxVibeData);
+    }
+    #else
     if (period > 0)
     {
       final durations:Array<Float> = [];
@@ -67,6 +87,7 @@ class HapticUtil
       Haptic.vibrateOneShot(duration, amplitudeValue, sharpness);
     }
     #end
+    #end // Fin de FEATURE_HAPTICS
   }
 
   /**

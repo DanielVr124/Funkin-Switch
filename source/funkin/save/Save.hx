@@ -135,6 +135,12 @@ class Save implements ConsoleClass
             },
           },
         },
+        #if switch
+        switchNoteInputLayout: 'Hybrid',
+        switchAutoPauseOnDisconnect: true,
+        switchTouchControlsEnabled: false,
+        switchTouchControlsScheme: 'Arrows',
+        #end
       },
       #if mobile
       mobileOptions: {
@@ -770,6 +776,11 @@ class Save implements ConsoleClass
   static function loadFromSlot(slot:Int):Save
   {
     trace('[SAVE] Loading save from slot $slot...');
+
+    #if switch
+    flixel.util.FlxSave._SWITCH_SAVE_PATH = "sdmc:/switch/Friday-Night-Funkin/saves";
+    #end
+
     FlxG.save.bind(Constants.SAVE_NAME + slot, Constants.SAVE_PATH);
     switch (FlxG.save.status)
     {
@@ -1231,6 +1242,23 @@ typedef SaveDataOptions =
       var p1:PlayerControlData;
       var p2:PlayerControlData;
     };
+
+  #if switch
+  /**
+   * The button group used for gameplay note input on Nintendo Switch.
+   * @default `Hybrid`
+   */
+  var switchNoteInputLayout:String;
+
+  /** Automatically pause gameplay when the complete Switch controller disconnects. */
+  var switchAutoPauseOnDisconnect:Bool;
+
+  /** Whether the original touchscreen note controls are enabled on Switch. */
+  var switchTouchControlsEnabled:Bool;
+
+  /** Selected original FNF touchscreen layout on Switch. */
+  var switchTouchControlsScheme:String;
+  #end
 }
 
 typedef PlayerControlData =

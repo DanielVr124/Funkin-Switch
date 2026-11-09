@@ -7,70 +7,124 @@ import funkin.play.notes.NoteDirection;
 import nx.NXMain;
 import nx.controls.NXControlButton;
 
-/**
- * Converts Switch D-pad and face-button transitions into the same precise
- * press/release signals consumed by the official note judgement system.
- *
- * Gameplay defaults:
- *   Y / D-pad Left  -> Left
- *   B / D-pad Down  -> Down
- *   X / D-pad Up    -> Up
- *   A / D-pad Right -> Right
- */
 class NXPreciseInputHandler
 {
   public var onButtonPressed:Null<(NoteDirection, Int64, Int) -> Void> = null;
   public var onButtonReleased:Null<(NoteDirection, Int64, Int) -> Void> = null;
 
-  private var _previous:Map<NXControlButton, Bool> = [];
+  private var _previousButtonStates:Map<NXControlButton, Bool> = new Map();
+  private var _awaitingNeutralInput:Bool = false;
 
   public function new() {}
 
+  /**
+   * Update the input handler - should be called every frame.
+   * Checks for button state changes and dispatches events.
+   */
   public function update():Void
   {
-    final controller = NXMain.nxController;
+    var controller = NXMain.nxController;
     if (controller == null) return;
 
-    final timestamp = PreciseInputManager.getCurrentTimestamp();
+    final timestamp = getCurrentTimestamp();
+    final mappedInputs = getMappedInputs();
 
-    check(controller, NXControlButton.LEFT, NoteDirection.LEFT, timestamp, 0);
-    check(controller, NXControlButton.DOWN, NoteDirection.DOWN, timestamp, 1);
-    check(controller, NXControlButton.UP, NoteDirection.UP, timestamp, 2);
-    check(controller, NXControlButton.RIGHT, NoteDirection.RIGHT, timestamp, 3);
-    check(controller, NXControlButton.Y, NoteDirection.LEFT, timestamp, 4);
-    check(controller, NXControlButton.B, NoteDirection.DOWN, timestamp, 5);
-    check(controller, NXControlButton.X, NoteDirection.UP, timestamp, 6);
-    check(controller, NXControlButton.A, NoteDirection.RIGHT, timestamp, 7);
+    // Release any sustained notes as soon as the controller becomes unusable.
+    if (!controller.isConnected)
+    {
+      for (input in mappedInputs)
+      {
+        checkButton(controller, input.button, input.direction, timestamp, input.code);
+      }
+      _awaitingNeutralInput = true;
+      return;
+    }
+
+    // The button used to reconnect must not become an accidental note hit.
+    // Wait until all buttons in the selected layout have been released.
+    if (_awaitingNeutralInput)
+    {
+      for (input in mappedInputs)
+      {
+        if (controller.isPressed(input.button)) return;
+      }
+
+      _previousButtonStates.clear();
+      _awaitingNeutralInput = false;
+      return;
+    }
+
+    for (input in mappedInputs)
+    {
+      checkButton(controller, input.button, input.direction, timestamp, input.code);
+    }
   }
 
-  private function check(
-    controller:NXController,
-    button:NXControlButton,
-    direction:NoteDirection,
-    timestamp:Int64,
-    buttonCode:Int
-  ):Void
+  private function getMappedInputs():Array<{button:NXControlButton, direction:NoteDirection, code:Int}>
   {
-    final wasPressed = _previous.exists(button) && _previous.get(button);
-    final isPressed = controller.isPressed(button);
+    return switch (funkin.Preferences.switchNoteInputLayout)
+    {
+      case 'DPad':
+        [
+          {button: UP, direction: NoteDirection.UP, code: 0},
+          {button: DOWN, direction: NoteDirection.DOWN, code: 1},
+          {button: LEFT, direction: NoteDirection.LEFT, code: 2},
+          {button: RIGHT, direction: NoteDirection.RIGHT, code: 3}
+        ];
+      case 'FaceButtons':
+        [
+          {button: X, direction: NoteDirection.UP, code: 4},
+          {button: B, direction: NoteDirection.DOWN, code: 5},
+          {button: Y, direction: NoteDirection.LEFT, code: 6},
+          {button: A, direction: NoteDirection.RIGHT, code: 7}
+        ];
+      case 'Shoulders':
+        [
+          {button: R, direction: NoteDirection.UP, code: 10},
+          {button: ZL, direction: NoteDirection.DOWN, code: 9},
+          {button: L, direction: NoteDirection.LEFT, code: 8},
+          {button: ZR, direction: NoteDirection.RIGHT, code: 11}
+        ];
+      default:
+        [
+          {button: UP, direction: NoteDirection.UP, code: 0},
+          {button: DOWN, direction: NoteDirection.DOWN, code: 1},
+          {button: LEFT, direction: NoteDirection.LEFT, code: 2},
+          {button: RIGHT, direction: NoteDirection.RIGHT, code: 3},
+          {button: X, direction: NoteDirection.UP, code: 4},
+          {button: B, direction: NoteDirection.DOWN, code: 5},
+          {button: Y, direction: NoteDirection.LEFT, code: 6},
+          {button: A, direction: NoteDirection.RIGHT, code: 7}
+        ];
+    };
+  }
 
-    if (isPressed && !wasPressed)
+  private function checkButton(controller:NXController, button:NXControlButton, direction:NoteDirection, timestamp:Int64, buttonCode:Int):Void
+  {
+    var currentState:Bool = controller.isPressed(button);
+    var previousState:Bool = _previousButtonStates.get(button) ?? false;
+
+    if (currentState && !previousState)
     {
       if (onButtonPressed != null) onButtonPressed(direction, timestamp, buttonCode);
     }
-    else if (!isPressed && wasPressed)
+    else if (!currentState && previousState)
     {
       if (onButtonReleased != null) onButtonReleased(direction, timestamp, buttonCode);
     }
 
-    _previous.set(button, isPressed);
+    _previousButtonStates.set(button, currentState);
+  }
+
+  private static function getCurrentTimestamp():Int64
+  {
+    return PreciseInputManager.getCurrentTimestamp();
   }
 
   public function destroy():Void
   {
     onButtonPressed = null;
     onButtonReleased = null;
-    _previous.clear();
   }
 }
 #end

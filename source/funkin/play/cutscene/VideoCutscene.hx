@@ -9,8 +9,11 @@ import funkin.play.PlayState;
 #if html5
 import funkin.graphics.video.FlxVideo;
 #end
-#if hxvlc
+#if (hxvlc && !switch)
 import funkin.graphics.video.FunkinVideoSprite;
+#end
+#if (switch && FEATURE_VIDEO_PLAYBACK)
+import switchvideo.SwitchVideo;
 #end
 
 /**
@@ -18,7 +21,7 @@ import funkin.graphics.video.FunkinVideoSprite;
  */
 class VideoCutscene
 {
-  #if hxvlc
+  #if (hxvlc && !switch)
   @:noCompletion
   static final DEFAULT_LANGUAGE:String = 'English';
   #end
@@ -27,8 +30,12 @@ class VideoCutscene
   #if html5
   static var vid:FlxVideo;
   #end
-  #if hxvlc
+  #if (hxvlc && !switch)
   static var vid:FunkinVideoSprite;
+  #end
+  #if (switch && FEATURE_VIDEO_PLAYBACK)
+  static var vid:SwitchVideo;
+  static var videoFinishing:Bool = false;
   #end
 
   /**
@@ -66,7 +73,9 @@ class VideoCutscene
   {
     if (PlayState.instance == null) return;
 
-    #if FEATURE_VIDEO_PLAYBACK
+    // Switch videos are opened by MPV using a resolved filesystem path, so
+    // the hxvlc/OpenFL asset-existence popup below is not valid for Switch.
+    #if (FEATURE_VIDEO_PLAYBACK && !switch)
     if (!openfl.Assets.exists(filePath))
     {
       // Display a popup.
@@ -96,13 +105,18 @@ class VideoCutscene
     }
     #end
 
-    #if NO_FEATURE_VIDEO_PLAYBACK
+    #if (switch && FEATURE_VIDEO_PLAYBACK)
+    playVideoSwitch(filePath);
+    #elseif switch
+    trace(" WARNING ".bold().bg_yellow() + " Video playback is not enabled on Switch. Calling video end callback instead.");
+    finishVideo();
+    #elseif NO_FEATURE_VIDEO_PLAYBACK
     trace(" WARNING ".bold().bg_yellow() + " Video playback is not enabled. Calling video end callback instead.");
     finishVideo();
     #else
     #if html5
     playVideoHTML5(Paths.stripLibrary(filePath));
-    #elseif hxvlc
+    #elseif (hxvlc && !switch)
     playVideoNative(filePath);
     #else
     throw "No video support for this platform!";
@@ -112,7 +126,9 @@ class VideoCutscene
 
   public static function isPlaying():Bool
   {
-    #if (html5 || hxvlc)
+    #if (switch && FEATURE_VIDEO_PLAYBACK)
+    return vid != null && !videoFinishing;
+    #elseif (html5 || (hxvlc && !switch))
     return vid != null;
     #else
     return false;
@@ -146,7 +162,7 @@ class VideoCutscene
   }
   #end
 
-  #if hxvlc
+  #if (hxvlc && !switch)
   static function playVideoNative(filePath:String):Void
   {
     // Video displays OVER the FlxState.
@@ -210,6 +226,88 @@ class VideoCutscene
   }
   #end
 
+
+  #if (switch && FEATURE_VIDEO_PLAYBACK)
+  /**
+   * Play a video using HxSwitchVideo's MPV backend.
+   * Switch assets are exposed through OpenFL's filesystem path so MPV can open
+   * the ROMFS file directly instead of receiving an asset-library identifier.
+   */
+  static function playVideoSwitch(filePath:String):Void
+  {
+    videoFinishing = false;
+
+    final video:SwitchVideo = new SwitchVideo();
+    vid = video;
+    video.zIndex = 0;
+    video.onEndReached = finishVideo.bind(0.5);
+    video.onFormatSetup = function():Void
+    {
+      // HxSwitchVideo initially sizes its sprite to the screen. Refit it while
+      // preserving the video's native aspect ratio.
+      final scale:Float = Math.min(FlxG.width / video.width, FlxG.height / video.height);
+      video.setGraphicSize(Std.int(video.width * scale), Std.int(video.height * scale));
+      video.updateHitbox();
+      video.screenCenter();
+    };
+    video.cameras = [PlayState.instance.camCutscene];
+
+    PlayState.instance.add(video);
+    PlayState.instance.refresh();
+
+    var nativePath:String = null;
+    try
+    {
+      nativePath = funkin.Assets.getPath(filePath);
+    }
+    catch (e:Dynamic)
+    {
+      trace('Unable to resolve Switch video path "$filePath": $e');
+      finishVideo(0.5);
+      return;
+    }
+
+    if (nativePath == null || nativePath.length == 0)
+    {
+      trace('Unable to resolve Switch video path: $filePath');
+      finishVideo(0.5);
+      return;
+    }
+
+    final fileOptions:Array<String> = [];
+    #if FEATURE_VIDEO_SUBTITLES
+    if (Preferences.subtitles)
+    {
+      fileOptions.push('sub-visibility=yes');
+      fileOptions.push('slang=en,eng,English');
+    }
+    else
+    {
+      fileOptions.push('sub-visibility=no');
+    }
+    fileOptions.push('alang=en,eng,English');
+    #else
+    fileOptions.push('sub-visibility=no');
+    #end
+
+    if (!video.load(nativePath, fileOptions))
+    {
+      trace('HxSwitchVideo could not load cutscene: $nativePath');
+      finishVideo(0.5);
+      return;
+    }
+
+    if (!video.play())
+    {
+      trace('HxSwitchVideo could not start cutscene: $nativePath');
+      finishVideo(0.5);
+      return;
+    }
+
+    onVideoStarted.dispatch();
+  }
+  #end
+
   public static function restartVideo():Void
   {
     #if html5
@@ -221,10 +319,19 @@ class VideoCutscene
     }
     #end
 
-    #if hxvlc
+    #if (hxvlc && !switch)
     if (vid != null)
     {
       vid.bitmap.time = 0;
+      vid.resume();
+      onVideoRestarted.dispatch();
+    }
+    #end
+
+    #if (switch && FEATURE_VIDEO_PLAYBACK)
+    if (vid != null)
+    {
+      vid.time = 0;
       vid.resume();
       onVideoRestarted.dispatch();
     }
@@ -241,7 +348,15 @@ class VideoCutscene
     }
     #end
 
-    #if hxvlc
+    #if (hxvlc && !switch)
+    if (vid != null)
+    {
+      vid.pause();
+      onVideoPaused.dispatch();
+    }
+    #end
+
+    #if (switch && FEATURE_VIDEO_PLAYBACK)
     if (vid != null)
     {
       vid.pause();
@@ -260,7 +375,15 @@ class VideoCutscene
     }
     #end
 
-    #if hxvlc
+    #if (hxvlc && !switch)
+    if (vid != null)
+    {
+      vid.visible = false;
+      blackScreen.visible = false;
+    }
+    #end
+
+    #if (switch && FEATURE_VIDEO_PLAYBACK)
     if (vid != null)
     {
       vid.visible = false;
@@ -279,7 +402,15 @@ class VideoCutscene
     }
     #end
 
-    #if hxvlc
+    #if (hxvlc && !switch)
+    if (vid != null)
+    {
+      vid.visible = true;
+      blackScreen.visible = false;
+    }
+    #end
+
+    #if (switch && FEATURE_VIDEO_PLAYBACK)
     if (vid != null)
     {
       vid.visible = true;
@@ -298,7 +429,15 @@ class VideoCutscene
     }
     #end
 
-    #if hxvlc
+    #if (hxvlc && !switch)
+    if (vid != null)
+    {
+      vid.resume();
+      onVideoResumed.dispatch();
+    }
+    #end
+
+    #if (switch && FEATURE_VIDEO_PLAYBACK)
     if (vid != null)
     {
       vid.resume();
@@ -314,6 +453,11 @@ class VideoCutscene
    */
   public static function finishVideo(?transitionTime:Float = 0.5):Void
   {
+    #if (switch && FEATURE_VIDEO_PLAYBACK)
+    if (videoFinishing) return;
+    videoFinishing = true;
+    #end
+
     trace('ALERT: Finish video cutscene called!');
 
     var cutsceneType:CutsceneType = VideoCutscene.cutsceneType;
@@ -325,7 +469,7 @@ class VideoCutscene
     }
     #end
 
-    #if hxvlc
+    #if (hxvlc && !switch)
     if (vid != null)
     {
       vid.stop();
@@ -333,7 +477,19 @@ class VideoCutscene
     }
     #end
 
-    #if (html5 || hxvlc)
+    #if (switch && FEATURE_VIDEO_PLAYBACK)
+    if (vid != null)
+    {
+      // Stop audio immediately, but defer destruction until the transition
+      // completes. HxSwitchVideo queues its own MPV teardown for the next frame.
+      // Keep the sprite active for one more frame so HxSwitchVideo can
+      // process its queued MPV teardown before the transition destroys it.
+      vid.visible = false;
+      vid.stop();
+    }
+    #end
+
+    #if (html5 || (hxvlc && !switch))
     vid.destroy();
     vid = null;
     #end
@@ -346,6 +502,9 @@ class VideoCutscene
       {
         PlayState.instance.remove(blackScreen);
         blackScreen = null;
+        #if (switch && FEATURE_VIDEO_PLAYBACK)
+        destroySwitchVideo();
+        #end
       }
     });
     FlxTween.tween(FlxG.camera, {zoom: PlayState.instance.stageZoom}, transitionTime, {
@@ -376,6 +535,24 @@ class VideoCutscene
     }
   }
 
+
+  #if (switch && FEATURE_VIDEO_PLAYBACK)
+  /**
+   * Remove the MPV sprite after HxSwitchVideo has had a frame to run its
+   * queued teardown. This avoids disposing MPV from inside its own EOF event.
+   */
+  static function destroySwitchVideo():Void
+  {
+    if (vid != null)
+    {
+      if (PlayState.instance != null) PlayState.instance.remove(vid);
+      vid.destroy();
+      vid = null;
+    }
+    videoFinishing = false;
+  }
+  #end
+
   /**
    * Destroy the active cutscene, if any. Separate from finishVideo() so that it doesn't trigger onCutsceneFinish().
    */
@@ -385,7 +562,7 @@ class VideoCutscene
     if (vid != null) PlayState.instance.remove(vid);
     #end
 
-    #if hxvlc
+    #if (hxvlc && !switch)
     if (vid != null)
     {
       vid.stop();
@@ -393,12 +570,16 @@ class VideoCutscene
     }
     #end
 
-    #if (html5 || hxvlc)
+    #if (html5 || (hxvlc && !switch))
     if (vid != null)
     {
       vid?.destroy();
       vid = null;
     }
+    #end
+
+    #if (switch && FEATURE_VIDEO_PLAYBACK)
+    destroySwitchVideo();
     #end
 
     if (blackScreen != null)

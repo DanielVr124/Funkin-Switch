@@ -8,6 +8,10 @@ import flixel.FlxG;
 import flixel.group.FlxSpriteGroup.FlxTypedSpriteGroup;
 import flixel.math.FlxMath;
 import flixel.text.FlxText;
+import flixel.text.FlxText.FlxTextAlign;
+#if switch
+import nx.NXMain;
+#end
 import flixel.tweens.FlxEase;
 import flixel.tweens.FlxTween;
 import flixel.util.FlxColor;
@@ -40,7 +44,11 @@ typedef PauseSubStateParams =
   /**
    * Whether the game paused because the window lost focus.
    */
-  ?lostFocus:Bool
+  ?lostFocus:Bool,
+  /** Whether the pause was caused by a disconnected Nintendo Switch controller. */
+  ?controllerDisconnected:Bool,
+  /** Whether the pause was caused by Switch song audio failing to recover. */
+  ?audioInterrupted:Bool
 };
 
 /**
@@ -180,6 +188,13 @@ class PauseSubState extends MusicBeatSubState
    */
   var lostFocus:Bool = false;
 
+  #if switch
+  var controllerDisconnected:Bool = false;
+  var audioInterrupted:Bool = false;
+  var controllerReconnectTimer:Float = 0;
+  var controllerReconnectNotice:FlxText;
+  #end
+
   // ===============
   // Graphics Variables
   // ===============
@@ -250,7 +265,7 @@ class PauseSubState extends MusicBeatSubState
   // ===============
   // Audio Variables
   // ===============
-  var pauseMusic:FunkinSound;
+  var pauseMusic:Null<FunkinSound>;
 
   // ===============
   // Constructor
@@ -261,6 +276,10 @@ class PauseSubState extends MusicBeatSubState
     super();
     this.currentMode = params?.mode ?? Standard;
     this.lostFocus = params?.lostFocus ?? false;
+    #if switch
+    this.controllerDisconnected = params?.controllerDisconnected ?? false;
+    this.audioInterrupted = params?.audioInterrupted ?? false;
+    #end
     this.onPause = onPause;
   }
 
@@ -286,13 +305,26 @@ class PauseSubState extends MusicBeatSubState
 
     startPauseMusic();
 
-    if (lostFocus && Preferences.autoPause) pauseMusic.pause();
+    if (lostFocus && Preferences.autoPause) pauseMusic?.pause();
 
     buildBackground();
 
     buildMetadata();
 
     regenerateMenu();
+
+    #if switch
+    if (controllerDisconnected || audioInterrupted)
+    {
+      final noticeText:String = controllerDisconnected
+        ? 'CONTROLLER DISCONNECTED\nReconnect your controller. The song will resume automatically.'
+        : 'AUDIO INTERRUPTED\nSong audio stopped unexpectedly. Select Restart Song to reload it.';
+      controllerReconnectNotice = new FlxText(40, FlxG.height - 100, FlxG.width - 80, noticeText, 24);
+      controllerReconnectNotice.setFormat(Paths.font('vcr.ttf'), 24, FlxColor.YELLOW, FlxTextAlign.CENTER);
+      controllerReconnectNotice.scrollFactor.set(0, 0);
+      add(controllerReconnectNotice);
+    }
+    #end
 
     transitionIn();
 
@@ -306,6 +338,33 @@ class PauseSubState extends MusicBeatSubState
   override public function update(elapsed:Float):Void
   {
     super.update(elapsed);
+
+    #if switch
+    if (controllerDisconnected)
+    {
+      final controllerReady:Bool = NXMain.nxController != null && NXMain.nxController.isConnected;
+      if (controllerReady)
+      {
+        controllerReconnectTimer += elapsed;
+        if (controllerReconnectNotice != null) controllerReconnectNotice.text = 'CONTROLLER RECONNECTED\nResuming...';
+        if (controllerReconnectTimer >= 0.65)
+        {
+          controllerDisconnected = false;
+          resume(this);
+          return;
+        }
+      }
+      else
+      {
+        controllerReconnectTimer = 0;
+        if (controllerReconnectNotice != null)
+          controllerReconnectNotice.text = 'CONTROLLER DISCONNECTED\nReconnect your controller. The song will resume automatically.';
+      }
+
+      // Do not let the reconnecting button navigate or activate pause-menu items.
+      return;
+    }
+    #end
 
     handleInputs();
   }
@@ -325,7 +384,7 @@ class PauseSubState extends MusicBeatSubState
     dataFadeTimer = null;
     hapticTimer.cancel();
     hapticTimer = null;
-    pauseMusic.stop();
+    pauseMusic?.stop();
     onPause = null;
   }
 
@@ -369,12 +428,19 @@ class PauseSubState extends MusicBeatSubState
    */
   function startPauseMusic():Void
   {
+    #if switch
+    // The pause menu is also used after a native audio failure. Do not open
+    // another channel against a stalled Switch audio device.
+    if (audioInterrupted) return;
+    #end
+
     var pauseMusicPath:String = Paths.music('breakfast$musicSuffix/breakfast$musicSuffix');
     pauseMusic = FunkinSound.load(pauseMusicPath, 0, true, true);
 
     if (pauseMusic == null)
     {
       FlxG.log.warn('Could not play pause music: ${pauseMusicPath} does not exist!');
+      return;
     }
 
     // Start playing at a random point in the song.
@@ -388,7 +454,7 @@ class PauseSubState extends MusicBeatSubState
   override public function onFocusLost():Void
   {
     super.onFocusLost();
-    if (Preferences.autoPause) pauseMusic.pause();
+    if (Preferences.autoPause) pauseMusic?.pause();
   }
 
   /**
@@ -397,7 +463,7 @@ class PauseSubState extends MusicBeatSubState
   override public function onFocus():Void
   {
     super.onFocus();
-    if (Preferences.autoPause) pauseMusic.resume();
+    if (Preferences.autoPause) pauseMusic?.resume();
   }
 
   /**

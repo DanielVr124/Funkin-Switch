@@ -2,6 +2,16 @@ package funkin.util;
 
 import flixel.util.FlxSignal.FlxTypedSignal;
 
+#if switch
+import cpp.Pointer;
+import switchLib.applets.Error;
+import switchLib.applets.Error.ErrorApplicationConfig;
+import switchLib.services.Set;
+import switchLib.Result;
+import switchLib.Types.ResultType;
+import switchLib.services.Applet;
+#end
+
 using StringTools;
 
 /**
@@ -162,7 +172,17 @@ class WindowUtil
   public static function showError(name:String, desc:String):Void
   {
     #if switch
-    lime.app.Application.current.window.alert(desc, name);
+    if (!NXMain.isRunningAsApplet())
+    {
+      var config:ErrorApplicationConfig = new ErrorApplicationConfig();
+      var result:ResultType = Error.errorApplicationCreate(Pointer.addressOf(config), name + "\n\n" + desc, "");
+
+      if (Result.R_SUCCEEDED(result))
+      {
+        Error.errorApplicationSetNumber(Pointer.addressOf(config), 0);
+        Error.errorApplicationShow(Pointer.addressOf(config));
+      }
+    }
     #else
     lime.app.Application.current.window.alert(lime.ui.MessageBoxType.ERROR, desc, name);
     #end
@@ -176,7 +196,17 @@ class WindowUtil
   public static function showWarning(name:String, desc:String):Void
   {
     #if switch
-    lime.app.Application.current.window.alert(desc, name);
+    if (!NXMain.isRunningAsApplet())
+    {
+      var config:ErrorApplicationConfig = new ErrorApplicationConfig();
+      var result:ResultType = Error.errorApplicationCreate(Pointer.addressOf(config), name + "\n\n" + desc, "");
+
+      if (Result.R_SUCCEEDED(result))
+      {
+        Error.errorApplicationSetNumber(Pointer.addressOf(config), 0);
+        Error.errorApplicationShow(Pointer.addressOf(config));
+      }
+    }
     #else
     lime.app.Application.current.window.alert(lime.ui.MessageBoxType.WARNING, desc, name);
     #end
@@ -190,7 +220,17 @@ class WindowUtil
   public static function showInformation(name:String, desc:String):Void
   {
     #if switch
-    lime.app.Application.current.window.alert(desc, name);
+    if (!NXMain.isRunningAsApplet())
+    {
+      var config:ErrorApplicationConfig = new ErrorApplicationConfig();
+      var result:ResultType = Error.errorApplicationCreate(Pointer.addressOf(config), name + "\n\n" + desc, "");
+
+      if (Result.R_SUCCEEDED(result))
+      {
+        Error.errorApplicationSetNumber(Pointer.addressOf(config), 0);
+        Error.errorApplicationShow(Pointer.addressOf(config));
+      }
+    }
     #else
     lime.app.Application.current.window.alert(lime.ui.MessageBoxType.INFORMATION, desc, name);
     #end
@@ -200,36 +240,16 @@ class WindowUtil
    * Modifies the VSync mode of the application window.
    * @param value The desired VSync mode to use.
    */
-  public static function setVSyncMode(value:WindowVSyncMode):Void
+  public static function setVSyncMode(value:lime.ui.WindowVSyncMode):Void
   {
-    #if switch
-    // Lime-NX uses lime.app.VSyncMode and exposes it as a Window property.
-    var nativeMode:lime.app.VSyncMode = switch (value)
-    {
-      case WindowVSyncMode.OFF: lime.app.VSyncMode.Off;
-      case WindowVSyncMode.ON: lime.app.VSyncMode.On;
-      case WindowVSyncMode.ADAPTIVE: lime.app.VSyncMode.Adaptive;
-      default: lime.app.VSyncMode.Off;
-    };
-    FlxG.stage.application.window.vsyncMode = nativeMode;
-    #else
-    // Desktop Lime uses the older WindowVSyncMode API.
-    var nativeMode:lime.ui.WindowVSyncMode = switch (value)
-    {
-      case WindowVSyncMode.OFF: lime.ui.WindowVSyncMode.OFF;
-      case WindowVSyncMode.ON: lime.ui.WindowVSyncMode.ON;
-      case WindowVSyncMode.ADAPTIVE: lime.ui.WindowVSyncMode.ADAPTIVE;
-      default: lime.ui.WindowVSyncMode.OFF;
-    };
-    var res:Bool = FlxG.stage.application.window.setVSyncMode(nativeMode);
+    var res:Bool = FlxG.stage.application.window.setVSyncMode(value);
 
     // SDL_GL_SetSwapInterval returns the value we assigned on success, https://wiki.libsdl.org/SDL2/SDL_GL_GetSwapInterval#return-value.
-    // In Lime, we can compare this to the original value to get a boolean.
+    // In lime, we can compare this to the original value to get a boolean.
     if (!res)
     {
       trace('Failed to set VSync mode to ' + value);
       FlxG.stage.application.window.setVSyncMode(lime.ui.WindowVSyncMode.OFF);
     }
-    #end
   }
 }

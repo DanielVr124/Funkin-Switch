@@ -786,18 +786,6 @@ class FunkinSprite extends FlxAnimate
   var filtered:Bool = false;
   var filterOffsets:Array<Float> = [0, 0];
 
-  #if switch
-  // The pinned FlxAnimate fork has a non-public checkRenderTexture hook.
-  // Override it without calling super (which Haxe does not expose here), while
-  // preserving FlxAnimate's own texture condition and enabling filtered sprites.
-  override function checkRenderTexture():Bool
-  {
-    var hasFilters:Bool = filters != null && filters.length > 0;
-    var animateNeedsTexture:Bool = isAnimate && useRenderTexture
-      && (alpha != 1 || shader != null || (blend != null && blend != NORMAL));
-    return hasFilters || animateNeedsTexture;
-  }
-  #else
   override function checkRenderTexture():Bool
   {
     // Forcefully enable render texture when we have filters.
@@ -805,7 +793,6 @@ class FunkinSprite extends FlxAnimate
 
     return super.checkRenderTexture();
   }
-  #end
 
   function set_filters(value:Null<Array<BitmapFilter>>):Null<Array<BitmapFilter>>
   {

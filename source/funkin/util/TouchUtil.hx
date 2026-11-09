@@ -50,7 +50,7 @@ class TouchUtil
    */
   public static var justMoved(get, never):Bool;
 
-  #if mobile
+  #if FLX_TOUCH
   /**
    * The first touch in the FlxG.touches list.
    */
@@ -168,7 +168,7 @@ class TouchUtil
   @:noCompletion
   static function get_released():Bool return touch != null && touch.released;
 
-  #if mobile
+  #if FLX_TOUCH
   @:noCompletion
   static function get_touch():FlxTouch
   {

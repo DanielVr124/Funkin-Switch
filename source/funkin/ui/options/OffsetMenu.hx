@@ -8,6 +8,8 @@ import funkin.mobile.ui.FunkinBackButton;
 import funkin.mobile.ui.FunkinHitbox;
 import funkin.mobile.ui.FunkinHitbox.FunkinHitboxControlSchemes;
 import funkin.mobile.input.ControlsHandler;
+#end
+#if FEATURE_TOUCH_CONTROLS
 import funkin.util.TouchUtil;
 #end
 import funkin.input.PreciseInputManager;

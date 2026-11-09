@@ -380,7 +380,7 @@ class MainMenuState extends MusicBeatState
     {
       uiStateMachine.transition(Idle);
 
-      #if FEATURE_TOUCH_CONTROLS
+      #if mobile
       // we want to reset our backButton + optionsButton if we are returning to the main menu from a substate like freeplay
       // however, we dont want to trigger these resets if we are entering the state
 

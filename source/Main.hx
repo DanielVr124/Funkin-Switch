@@ -13,7 +13,7 @@ import funkin.ui.debug.FunkinDebugDisplay.DebugDisplayMode;
 import funkin.save.Save;
 import funkin.FunkinMemory;
 import funkin.audio.FunkinSound;
-#if hxvlc
+#if (hxvlc && !switch)
 import hxvlc.util.Handle;
 #end
 import openfl.display.Sprite;
@@ -22,12 +22,14 @@ import openfl.Lib;
 import openfl.media.Video;
 import openfl.net.NetStream;
 import funkin.util.WindowUtil;
-#if switch
-import nx.NXGame;
-import nx.NXMain;
-#end
 
 using funkin.util.AnsiUtil;
+
+#if switch
+import nx.NXMain;
+import nx.NXGame;
+#end
+
 
 /**
  * The main class which initializes HaxeFlixel and starts the game in its initial state.
@@ -51,9 +53,6 @@ class Main extends Sprite
     #elseif ios
     // On iOS use Documents Dir.
     Sys.setCwd(haxe.io.Path.addTrailingSlash(lime.system.System.documentsDirectory));
-    #elseif switch
-    // Nintendo Switch application assets are mounted read-only through RomFS.
-    Sys.setCwd("romfs:/");
     #end
 
     // We need to make the crash handler LITERALLY FIRST so nothing EVER gets past it.
@@ -152,20 +151,21 @@ class Main extends Sprite
     // Add this signal so the player can toggle the debug display using a hotkey.
     FlxG.signals.postUpdate.add(handleDebugDisplayKeys);
 
+    #if switch
+    // Passively watch looping music in menus. The monitor only logs stalls;
+    // it never performs native audio-device teardown during a frame update.
+    FlxG.signals.postUpdate.add(funkin.audio.SwitchAudioRecovery.update);
+    #end
+
     #if mobile
     // Add this signal so we can reposition and resize the memory and fps counter.
     FlxG.signals.preUpdate.add(repositionCounters.bind(true));
     #end
 
-    // Switch game assets live in read-only RomFS; persistent progress belongs on SD.
-    #if switch
-    flixel.util.FlxSave._SWITCH_SAVE_PATH = "sdmc:/switch/Funkin-Switch/saves";
-    #end
-
     // George recommends binding the save before FlxGame is created.
     Save.load();
 
-    #if hxvlc
+    #if (hxvlc && !switch)
     // Initialize hxvlc's Handle here so the videos are loading faster.
     Handle.initAsync(function(success:Bool):Void
     {
@@ -188,16 +188,16 @@ class Main extends Sprite
 
     var framerate:Int = Preferences.unlockedFramerate ? 0 : Preferences.framerate;
 
-    var game:FlxGame;
     #if switch
-    // Initialize libnx controller services before the first Flixel update.
     NXMain.init();
-    game = new NXGame(gameWidth, gameHeight, initialState, framerate, framerate, skipSplash,
+    var game:NXGame = new NXGame(gameWidth, gameHeight, initialState, zoom, Preferences.framerate, Preferences.framerate, skipSplash,
       (FlxG.stage.window.fullscreen || Preferences.autoFullscreen));
     #else
-    game = new FlxGame(gameWidth, gameHeight, initialState, framerate, framerate, skipSplash,
+    var game:FlxGame = new FlxGame(gameWidth, gameHeight, initialState, framerate, framerate, skipSplash,
       (FlxG.stage.window.fullscreen || Preferences.autoFullscreen));
     #end
+
+
 
     // FlxG.game._customSoundTray wants just the class, it calls new from
     // create() in there, which gets called when it's added to the stage

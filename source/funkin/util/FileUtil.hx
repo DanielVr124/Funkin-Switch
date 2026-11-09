@@ -133,7 +133,7 @@ class FileUtil
    */
   public static function browseForDirectory(dialogTitle:String, onSelect:(String) -> Void, ?onCancel:() -> Void, ?defaultPath:String):Void
   {
-    #if (html5 || switch)
+    #if html5
     trace('WARNING: browseForDirectory not implemented for this platform');
 
     if (onCancel != null)
@@ -169,7 +169,7 @@ class FileUtil
   public static function browseForFile(dialogTitle:String, ?typeFilter:Array<FileFilter>, onSelect:(SelectedFileData) -> Void, ?onCancel:() -> Void,
       ?defaultPath:String):Void
   {
-    #if (html5 || switch)
+    #if html5
     trace('WARNING: browseForFile not implemented for this platform');
 
     if (onCancel != null)
@@ -206,7 +206,7 @@ class FileUtil
   public static function browseForMultipleFiles(dialogTitle:String, ?typeFilter:Array<FileFilter>, onSelect:(Array<String>) -> Void, ?onCancel:() -> Void,
       ?defaultPath:String):Void
   {
-    #if (html5 || switch)
+    #if html5
     trace('WARNING: browseForMultipleFiles not implemented for this platform');
 
     if (onCancel != null)
@@ -243,7 +243,7 @@ class FileUtil
   public static function browseForSaveFile(dialogTitle:String, ?typeFilter:Array<FileFilter>, onSelect:(String) -> Void, ?onCancel:() -> Void,
       ?defaultPath:String):Void
   {
-    #if (html5 || switch)
+    #if html5
     trace('WARNING: browseForSaveFile not implemented for this platform');
 
     if (onCancel != null)
@@ -279,7 +279,7 @@ class FileUtil
   public static function saveFile(dialogTitle:String, data:Bytes, ?typeFilter:Array<FileFilter>, ?onSave:(String) -> Void, ?onCancel:() -> Void,
       ?defaultPath:String):Void
   {
-    #if (html5 || switch)
+    #if html5
     trace('WARNING: saveFile not implemented for this platform');
 
     if (onCancel != null)
@@ -293,7 +293,7 @@ class FileUtil
       {
         if (data != null)
         {
-          sys.io.File.saveBytes(filepath, data);
+          Bytes.toFile(filepath, data);
         }
 
         if (onSave != null)
@@ -323,7 +323,7 @@ class FileUtil
   public static function saveMultipleFiles(resources:Array<Entry>, ?onSaveAll:(Array<String>) -> Void, ?onCancel:() -> Void, ?defaultPath:String,
       force:Bool = false):Void
   {
-    #if (html5 || switch)
+    #if html5
     trace('WARNING: saveMultipleFiles not implemented for this platform');
 
     if (onCancel != null)
@@ -759,24 +759,6 @@ class FileUtil
    */
   public static function createDirIfNotExists(dir:String):Void
   {
-    #if switch
-    // The homebrew save/log root may not exist on a fresh SD card. libnx
-    // requires each parent folder to exist before its child can be created.
-    var normalizedDir = StringTools.replace(dir, "\\", "/");
-    var parts = normalizedDir.split("/");
-    var currentPath = parts.length > 0 && parts[0] == "sdmc:" ? "sdmc:" : "";
-
-    for (part in parts)
-    {
-      if (part == "" || part == "sdmc:") continue;
-
-      currentPath = currentPath == "" ? part : currentPath + "/" + part;
-      if (!sys.FileSystem.exists(currentPath))
-      {
-        sys.FileSystem.createDirectory(currentPath);
-      }
-    }
-    #else
     if (!directoryExists(dir))
     {
       #if sys
@@ -785,7 +767,6 @@ class FileUtil
       throw 'Directory creation is not supported on this platform.';
       #end
     }
-    #end
   }
 
   /**
