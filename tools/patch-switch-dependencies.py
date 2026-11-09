@@ -96,16 +96,15 @@ replace_once(
 # libmpv is packaged with SDL2 video, audio, and gamepad backends enabled.
 # Lime's Switch NRO template currently links SDL3 but omits SDL2, leaving the
 # references from libmpv.a unresolved during the final application link.
-# Add the Switch portlibs directory explicitly to the final link flags.
-# The generated template's LIBDIRS/LIBPATHS list is not reliably propagated
-# into the devkitPro link command in this CI environment. MPV and SDL2 are
-# installed by switch-libmpv and switch-sdl2 under this exact portlibs path.
+# The generated Makefile exports LIBPATHS to devkitPro's switch_rules
+# linker recipe. Adding the portlibs path to LDFLAGS alone is ineffective:
+# switch_rules constructs the link command from LIBPATHS.
 switch_makefile = root / ".haxelib/lime/git/templates/switch/MakeFileNRO"
 replace_once(
     switch_makefile,
-    'LDFLAGS\t=\t-specs=$(DEVKITPRO)/libnx/switch.specs -g $(ARCH) -Wl,-Map,$(notdir $*.map)',
-    'LDFLAGS\t=\t-specs=$(DEVKITPRO)/libnx/switch.specs -g $(ARCH) -L$(DEVKITPRO)/portlibs/switch/lib -Wl,-Map,$(notdir $*.map)',
-    "Lime Switch portlibs library search path",
+    'export LIBPATHS\t:=\t$(foreach dir,$(LIBDIRS),-L$(dir)/lib)',
+    'export LIBPATHS\t:=\t$(foreach dir,$(LIBDIRS),-L$(dir)/lib) -L$(DEVKITPRO)/portlibs/switch/lib',
+    "Lime Switch portlibs LIBPATHS",
 )
 replace_once(
     switch_makefile,
