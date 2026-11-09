@@ -125,7 +125,7 @@ replace_once(
 )
 replace_once(
     switch_makefile,
-    "-lSDL3 -lSDL2 -lharfbuzz",
-    f"-lSDL3 {sdl2_archive} -lharfbuzz",
+    "-lvorbisfile -lcurl -lvorbis -logg -lSDL3 -lharfbuzz \\\n",
+    f"-lvorbisfile -lcurl -lvorbis -logg -lSDL3 {sdl2_archive} -lharfbuzz \\\n",
     "Lime Switch SDL2 absolute archive link required by MPV",
 )
