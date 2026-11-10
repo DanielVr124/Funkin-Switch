@@ -167,8 +167,8 @@ with tempfile.TemporaryDirectory(prefix="switch-sdl2-namespace-") as temp:
         )
 
     # Replace atomically only after both rebuilt archives pass verification.
-    SDL2.replace(patched_sdl2)
-    MPV.replace(patched_mpv)
+    patched_sdl2.replace(SDL2)
+    patched_mpv.replace(MPV)
 
 print(
     f"Isolated {len(mapping)} SDL2 symbols under the MPVSDL2_ prefix across "
