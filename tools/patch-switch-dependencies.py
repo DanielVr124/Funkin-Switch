@@ -99,16 +99,44 @@ replace_once(
 # Resolve the installed archives now and use absolute paths in LIBS. This avoids
 # relying on LIBPATHS surviving Lime's nested Make invocation.
 devkitpro = Path(os.environ.get("DEVKITPRO", "/opt/devkitpro"))
-switch_libdir = devkitpro / "portlibs" / "switch" / "lib"
-mpv_archive = switch_libdir / "libmpv.a"
-sdl2_archive = switch_libdir / "libSDL2.a"
-for archive in (mpv_archive, sdl2_archive):
-    if not archive.is_file():
+
+
+def find_switch_archive(filename: str, package: str) -> Path:
+    # Do not assume a fixed portlibs layout: devkitPro package revisions may
+    # install portlibs in a versioned or package-specific subdirectory.
+    matches = sorted(
+        path for path in devkitpro.rglob(filename) if path.is_file()
+    )
+    if not matches:
         raise SystemExit(
-            f"Required Switch static library is missing: {archive}. "
-            "Check the installed switch-libmpv and switch-sdl2 packages."
+            f"Could not locate {filename} from installed package {package} "
+            "under "
+            f"{devkitpro}. Check the package file list with dkp-pacman -Ql "
+            f"{package}."
         )
-    print(f"Verified Switch linker input: {archive} ({archive.stat().st_size} bytes)")
+    # Prefer the standard Switch portlibs tree when more than one copy exists.
+    matches.sort(
+        key=lambda path: (
+            "portlibs/switch" not in path.as_posix(),
+            len(path.parts),
+            path.as_posix(),
+        )
+    )
+    archive = matches[0].resolve()
+    print(
+        f"Resolved {package} linker input: {archive} "
+        f"({archive.stat().st_size} bytes)"
+    )
+    if len(matches) > 1:
+        print(
+            f"Other {filename} candidates: "
+            + ", ".join(str(path) for path in matches[1:])
+        )
+    return archive
+
+
+mpv_archive = find_switch_archive("libmpv.a", "switch-libmpv")
+sdl2_archive = find_switch_archive("libSDL2.a", "switch-sdl2")
 
 switch_makefile = root / ".haxelib/lime/git/templates/switch/MakeFileNRO"
 replace_once(
