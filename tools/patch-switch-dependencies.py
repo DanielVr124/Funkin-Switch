@@ -106,6 +106,30 @@ replace_once(
     lime_audio_source,
     """\tprivate function checkPlay(_):Void
 \t{
+\t\tif (AL.getSourcei(handle, AL.SOURCE_STATE) == AL.PLAYING)
+\t\t{
+\t\t\treturn;
+\t\t}
+
+\t\tif (loops > 0)
+\t\t{
+\t\t\tplaying = false;
+\t\t\tloops--;
+\t\t\tsetCurrentTime(0);
+\t\t\tplay();
+\t\t\treturn;
+\t\t}
+
+\t\tif (!completed)
+\t\t{
+\t\t\tstop();
+\t\t\tparent.onComplete.dispatch();
+\t\t}
+
+\t\tcompleted = true;
+\t}""",
+    """\tprivate function checkPlay(_):Void
+\t{
 \t\tif (handle == null || !playing) return;
 
 \t\tvar sourceState = AL.getSourcei(handle, AL.SOURCE_STATE);
