@@ -1,9 +1,10 @@
 #!/usr/bin/env python3
-"""Give the Switch MPV build its own SDL2 symbol namespace.
+"""Give Switch SDL2 consumers a shared namespace separate from Lime SDL3.
 
-Lime links SDL3, while devkitPro's prebuilt libmpv.a uses SDL2. Their C APIs
-export overlapping names. Rename SDL2 definitions and MPV's corresponding
-references, rebuilding each archive from individually transformed members.
+Lime links SDL3, while devkitPro's prebuilt MPV and OpenAL Soft libraries use
+SDL2. Their C APIs export overlapping names. Rename SDL2 definitions and
+both consumers' corresponding references, rebuilding each archive from
+individually transformed members.
 """
 import os
 from pathlib import Path
@@ -15,6 +16,7 @@ import tempfile
 LIB_DIR = Path("/opt/devkitpro/portlibs/switch/lib")
 SDL2 = LIB_DIR / "libSDL2.a"
 MPV = LIB_DIR / "libmpv.a"
+OPENAL = LIB_DIR / "libopenal.a"
 
 DEVKITPRO = Path(os.environ.get("DEVKITPRO", "/opt/devkitpro"))
 DEVKITA64 = Path(os.environ.get("DEVKITA64", str(DEVKITPRO / "devkitA64")))
@@ -114,27 +116,33 @@ def transform_archive(
     run(AR, "rcsD", str(destination), *member_names, cwd=work)
 
 
-for library in (SDL2, MPV):
+for library in (SDL2, MPV, OPENAL):
     if not library.is_file():
         raise SystemExit(f"Required Switch static library is missing: {library}")
 
-# Gather all SDL2 definitions and confirm MPV only references symbols present
-# in the SDL2 archive before modifying either library.
+# Gather all SDL2 definitions and confirm both SDL2 consumers reference only
+# symbols present in the SDL2 archive before modifying any of the libraries.
 symbols = symbols_from_nm(
     run(NM, "-g", "--defined-only", str(SDL2)), "SDL_"
 )
 if not symbols:
     raise SystemExit(f"No exported SDL2 symbols found in {SDL2}")
 
-mpv_sdl_refs = symbols_from_nm(run(NM, "-u", str(MPV)), "SDL_")
-missing_refs = sorted(mpv_sdl_refs - symbols)
-if missing_refs:
-    raise SystemExit(
-        "MPV references SDL symbols not exported by libSDL2.a:\n"
-        + "\n".join(missing_refs[:40])
-    )
+consumers = {
+    "MPV": symbols_from_nm(run(NM, "-u", str(MPV)), "SDL_"),
+    "OpenAL Soft": symbols_from_nm(run(NM, "-u", str(OPENAL)), "SDL_"),
+}
+for consumer, references in consumers.items():
+    missing_refs = sorted(references - symbols)
+    if missing_refs:
+        raise SystemExit(
+            f"{consumer} references SDL symbols not exported by libSDL2.a:\n"
+            + "\n".join(missing_refs[:40])
+        )
 
-mapping = {name: "MPVSDL2_" + name for name in sorted(symbols)}
+# All SDL2 clients use the same private prefix, while Lime keeps SDL3's
+# original unprefixed symbols. This is required for OpenAL Soft's SDL2 backend.
+mapping = {name: "SWITCHSDL2_" + name for name in sorted(symbols)}
 
 with tempfile.TemporaryDirectory(prefix="switch-sdl2-namespace-") as temp:
     temp_path = Path(temp)
@@ -146,9 +154,11 @@ with tempfile.TemporaryDirectory(prefix="switch-sdl2-namespace-") as temp:
 
     patched_sdl2 = temp_path / "libSDL2.a"
     patched_mpv = temp_path / "libmpv.a"
+    patched_openal = temp_path / "libopenal.a"
 
     transform_archive(SDL2, patched_sdl2, map_file, temp_path)
     transform_archive(MPV, patched_mpv, map_file, temp_path)
+    transform_archive(OPENAL, patched_openal, map_file, temp_path)
 
     remaining = symbols_from_nm(
         run(NM, "-g", "--defined-only", str(patched_sdl2)), "SDL_"
@@ -159,18 +169,24 @@ with tempfile.TemporaryDirectory(prefix="switch-sdl2-namespace-") as temp:
             "rewriting:\n" + "\n".join(sorted(remaining)[:40])
         )
 
-    unresolved = symbols_from_nm(run(NM, "-u", str(patched_mpv)), "SDL_")
-    if unresolved:
-        raise SystemExit(
-            "MPV still has unprefixed SDL references after per-member rewriting:\n"
-            + "\n".join(sorted(unresolved)[:40])
-        )
+    for consumer_name, consumer_archive in (
+        ("MPV", patched_mpv),
+        ("OpenAL Soft", patched_openal),
+    ):
+        unresolved = symbols_from_nm(run(NM, "-u", str(consumer_archive)), "SDL_")
+        if unresolved:
+            raise SystemExit(
+                f"{consumer_name} still has unprefixed SDL references after "
+                "per-member rewriting:\n"
+                + "\n".join(sorted(unresolved)[:40])
+            )
 
-    # Replace atomically only after both rebuilt archives pass verification.
+    # Replace atomically only after all three rebuilt archives pass verification.
     patched_sdl2.replace(SDL2)
     patched_mpv.replace(MPV)
+    patched_openal.replace(OPENAL)
 
 print(
-    f"Isolated {len(mapping)} SDL2 symbols under the MPVSDL2_ prefix across "
-    "both archives; Lime's SDL3 symbols remain unchanged."
+    f"Isolated {len(mapping)} SDL2 symbols under the SWITCHSDL2_ prefix across "
+    "libSDL2.a, libmpv.a, and libopenal.a; Lime's SDL3 symbols remain unchanged."
 )
