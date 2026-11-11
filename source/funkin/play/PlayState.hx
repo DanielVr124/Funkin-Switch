@@ -1304,6 +1304,19 @@ class PlayState extends MusicBeatSubState
       }
     }
 
+    #if switch
+    // A channel whose position query remains stalled will not fire its normal
+    // completion callback. Finish from the fallback Conductor clock instead.
+    if (switchAudioClockStalled && !startingSong && !isSongEnd && !isPlayerDying && !isInCutscene
+      && FlxG.sound.music != null && FlxG.sound.music.length > 0
+      && Conductor.instance.songPosition >= FlxG.sound.music.length - 1)
+    {
+      trace('SWITCH AUDIO: Reached the end of the song on the fallback gameplay clock.');
+      endSong(skipEndingTransition);
+      return;
+    }
+    #end
+
     var pauseButtonCheck:Bool = false;
     var androidPause:Bool = false;
     // So the player wouldn't miss when pressing the pause button
@@ -2948,13 +2961,13 @@ class PlayState extends MusicBeatSubState
           {
             Conductor.instance.update(recoveredSongPosition, false);
           }
-          else
-          {
-            final targetTime:Float = Math.max(0, Math.min(music.length - 1,
-              Conductor.instance.songPosition - Conductor.instance.combinedOffset));
-            music.time = targetTime;
-            if (vocals != null) vocals.time = targetTime;
-          }
+
+          // Re-seek the music and vocal tracks to the later of the two clocks.
+          // Setting time on an active FlxSound restarts its channel at that point.
+          final targetTime:Float = Math.max(0, Math.min(music.length - 1,
+            Conductor.instance.songPosition - Conductor.instance.combinedOffset));
+          music.time = targetTime;
+          if (vocals != null) vocals.time = targetTime;
 
           trace('SWITCH AUDIO: Playback clock resumed; synchronized it to the active gameplay clock.');
         }
