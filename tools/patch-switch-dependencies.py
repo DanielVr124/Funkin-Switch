@@ -48,6 +48,35 @@ else:
         "Lime System.setHint compatibility",
     )
 
+# Lime-NX's older pinned Switch branch reads playback time with AL_SEC_OFFSET.
+# The newer Lime-NX backend uses AL_BYTE_OFFSET for non-streamed buffers instead;
+# this avoids a stale/unsupported seconds-offset query on the Switch OpenAL path.
+# Keep the calculation equivalent to AudioSource.getLength(), including offsets.
+lime_audio_source = root / ".haxelib/lime/git/src/lime/_internal/backend/native/NativeAudioSource.hx"
+old_audio_clock = """\t\t\tvar time = (AL.getSourcef(handle, AL.SEC_OFFSET) * 1000.0) - parent.offset;
+
+\t\t\treturn time < 0 ? 0 : time;"""
+new_audio_clock = """\t\t\t// BYTE_OFFSET is more reliable than SEC_OFFSET on the Switch OpenAL
+\t\t\t// backend for static buffers. Convert the byte position to milliseconds.
+\t\t\tif (dataLength <= 0 || parent.buffer.sampleRate <= 0) return 0;
+
+\t\t\tvar byteOffset = AL.getSourcei(handle, AL.BYTE_OFFSET);
+\t\t\tvar bytesPerFrame = parent.buffer.channels * (parent.buffer.bitsPerSample / 8.0);
+\t\t\tif (bytesPerFrame <= 0) return 0;
+
+\t\t\tvar totalFrames = dataLength / bytesPerFrame;
+\t\t\tvar totalSeconds = totalFrames / parent.buffer.sampleRate;
+\t\t\tvar ratio = byteOffset / dataLength;
+\t\t\tvar time = (totalSeconds * ratio * 1000.0) - parent.offset;
+
+\t\t\treturn time < 0 ? 0 : time;"""
+replace_once(
+    lime_audio_source,
+    old_audio_clock,
+    new_audio_clock,
+    "Lime Switch OpenAL playback clock (BYTE_OFFSET)",
+)
+
 # SDL's Linux host build enables BSD string helpers in SDL_build_config.h.
 # The Lime fork's Linux linker block must explicitly link libbsd for those
 # symbols; merely installing libbsd-dev does not add it to the link command.
