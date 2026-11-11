@@ -158,7 +158,11 @@ class MenuTypedList<T:MenuListItem> extends FlxTypedGroup<T>
         selectItem(newIndex);
       }
     }
+    #if switch
+    if (TouchUtil.pressed)
+    #else
     else if (TouchUtil.pressed)
+    #end
     {
       for (i in 0...members.length)
       {
