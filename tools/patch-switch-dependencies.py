@@ -83,7 +83,7 @@ replace_once(
 replace_once(
     lime_audio_source,
     "\tprivate var playing:Bool;",
-    "\tprivate var playing:Bool;\n\tprivate var lastByteOffset:Int = 0;",
+    "\tprivate var playing:Bool;\n\tprivate var lastByteOffset:Int = 0;\n\tprivate var recoveryCheckpoint:Int = -1;",
     "Lime Switch OpenAL last known playback offset",
 )
 replace_once(
@@ -106,57 +106,49 @@ replace_once(
     lime_audio_source,
     """\tprivate function checkPlay(_):Void
 \t{
-\t\tif (AL.getSourcei(handle, AL.SOURCE_STATE) == AL.PLAYING)
-\t\t{
-\t\t\treturn;
-\t\t}
-
-\t\tif (loops > 0)
-\t\t{
-\t\t\tplaying = false;
-\t\t\tloops--;
-\t\t\tsetCurrentTime(0);
-\t\t\tplay();
-\t\t\treturn;
-\t\t}
-
-\t\tif (!completed)
-\t\t{
-\t\t\tstop();
-\t\t\tparent.onComplete.dispatch();
-\t\t}
-
-\t\tcompleted = true;
-\t}""",
-    """\tprivate function checkPlay(_):Void
-\t{
 \t\tif (handle == null || !playing) return;
 
 \t\tvar sourceState = AL.getSourcei(handle, AL.SOURCE_STATE);
 \t\tif (sourceState == AL.PLAYING)
 \t\t{
 \t\t\tvar byteOffset = AL.getSourcei(handle, AL.BYTE_OFFSET);
-\t\t\tif (byteOffset > lastByteOffset) lastByteOffset = byteOffset;
+\t\t\tvar bytesPerFrame = parent.buffer.channels * (parent.buffer.bitsPerSample / 8.0);
+\t\t\tvar recoveryProgressBytes = Std.int(parent.buffer.sampleRate * bytesPerFrame * 0.25);
+\t\t\tif (byteOffset > lastByteOffset)
+\t\t\t{
+\t\t\t\tlastByteOffset = byteOffset;
+\t\t\t\t// Only clear a recovery checkpoint after at least 250 ms of progress.
+\t\t\t\tif (recoveryCheckpoint >= 0 && byteOffset >= recoveryCheckpoint + recoveryProgressBytes)
+\t\t\t\t{
+\t\t\t\t\trecoveryCheckpoint = -1;
+\t\t\t\t}
+\t\t\t}
 \t\t\treturn;
 \t\t}
 
 \t\t// A paused source is intentional. Only recover an actually stopped source.
 \t\tif (sourceState != AL.STOPPED) return;
 
-\t\t// Switch OpenAL can stop a source before its static buffer is exhausted.
-\t\t// Resume from the last observed byte position instead of treating that
-\t\t// underrun as the end of the song.
+\t\t// Resume from the last observed byte position, but do not repeatedly
+\t\t// restart at a position where the previous recovery made no progress.
 \t\tvar bytesPerFrame = parent.buffer.channels * (parent.buffer.bitsPerSample / 8.0);
 \t\tvar finalFrameOffset = dataLength - Std.int(bytesPerFrame);
 \t\tvar byteOffset = AL.getSourcei(handle, AL.BYTE_OFFSET);
 \t\tvar resumeOffset = byteOffset > lastByteOffset ? byteOffset : lastByteOffset;
-\t\tif (bytesPerFrame > 0 && resumeOffset < finalFrameOffset)
+\t\tvar recoveryProgressBytes = Std.int(parent.buffer.sampleRate * bytesPerFrame * 0.25);
+\t\tvar repeatedStall = recoveryCheckpoint >= 0 && resumeOffset <= recoveryCheckpoint + recoveryProgressBytes;
+\t\tif (!repeatedStall && bytesPerFrame > 0 && resumeOffset < finalFrameOffset)
 \t\t{
+\t\t\trecoveryCheckpoint = resumeOffset;
 \t\t\tlastByteOffset = resumeOffset;
 \t\t\tAL.sourcei(handle, AL.BYTE_OFFSET, resumeOffset);
 \t\t\tAL.sourcePlay(handle);
 \t\t\treturn;
 \t\t}
+
+\t\t// If a recovery cannot advance the source, don't fall back to looping
+\t\t// the same section from the beginning.
+\t\tif (repeatedStall) loops = 0;
 
 \t\tif (loops > 0)
 \t\t{
