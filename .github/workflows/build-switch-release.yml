@@ -12,6 +12,7 @@ on:
       - 'hmm-switch.json'
       - 'tools/patch-switch-dependencies.py'
       - 'tools/isolate-switch-sdl2.py'
+      - 'tools/build-switch-sdl2-audout.py'
       - '.github/workflows/build-switch-release.yml'
       - '.github/actions/setup-haxe/**'
       - 'assets/**'
@@ -67,6 +68,12 @@ jobs:
             switch-dav1d switch-ffmpeg switch-libarchive switch-libass \
             switch-libexpat switch-libfribidi switch-libmpv switch-sdl2 switch-libplacebo \
             switch-libzstd switch-lz4
+
+      # Test the known-good SDL2 audout service instead of the container's
+      # newer audren service. Only libSDL2.a is replaced; the rest of the
+      # devkitPro toolchain remains pinned as supplied by the container.
+      - name: Build SDL2 with the Switch audout audio service
+        run: python3 tools/build-switch-sdl2-audout.py
 
       # MPV's prebuilt port uses SDL2, while Lime uses SDL3. Their C APIs
       # export overlapping symbol names, so isolate MPV's SDL2 ABI before link.
