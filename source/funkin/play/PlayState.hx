@@ -2918,6 +2918,7 @@ class PlayState extends MusicBeatSubState
 
       if (startingSong || needsReset || isPlayerDying || isSongEnd)
       {
+        switchAudioClockStalled = false;
         switchAudioWasPlaying = false;
       }
       return false;
