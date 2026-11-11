@@ -72,11 +72,11 @@ def symbols_from_nm(output: str, prefix: str) -> set[str]:
 def transform_archive(
     source: Path, destination: Path, map_file: Path, temp_root: Path
 ) -> None:
-    """Transform each archive member separately, then recreate its index.
+    """Transform every archive member, including repeated member names.
 
-    Running objcopy on the archive as a whole can leave members unchanged with
-    some cross-binutils builds. Extracting and transforming each ELF object
-    makes the symbol rewrite explicit and lets ar rebuild a correct index.
+    GNU ar's ordinary extraction overwrites duplicate filenames. Use its N
+    modifier to extract each occurrence individually, then give rebuilt
+    members unique deterministic names while preserving archive order.
     """
     member_names = [
         line.strip()
@@ -85,35 +85,38 @@ def transform_archive(
     ]
     if not member_names:
         raise SystemExit(f"No members found in static archive: {source}")
-    if len(member_names) != len(set(member_names)):
-        raise SystemExit(
-            f"Archive has duplicate member names; refusing lossy extraction: {source}"
-        )
 
     work = temp_root / (source.stem + "-members")
     work.mkdir()
-    run(AR, "x", str(source), cwd=work)
+    occurrences: dict[str, int] = {}
+    transformed_names = []
 
-    missing = [name for name in member_names if not (work / name).is_file()]
-    if missing:
-        raise SystemExit(
-            f"Could not extract {len(missing)} member(s) from {source}: "
-            + ", ".join(missing[:10])
-        )
+    for index, name in enumerate(member_names):
+        occurrence = occurrences.get(name, 0) + 1
+        occurrences[name] = occurrence
+        extracted = work / f"member-{index:06d}.o"
+        # Extract the Nth occurrence of this member name, avoiding lossy
+        # extraction when an archive contains repeated object basenames.
+        run(AR, "pN", str(occurrence), str(source), name, cwd=work)
+        # ar p writes to stdout; use a dedicated extraction command so binary
+        # object bytes are never decoded or routed through text.
+        with extracted.open("wb") as output:
+            subprocess.run(
+                [AR, "pN", str(occurrence), str(source), name],
+                cwd=work, stdout=output, check=True
+            )
 
-    for name in member_names:
-        original = work / name
-        transformed = work / (name + ".renamed")
+        transformed = work / f"renamed-{index:06d}.o"
         run(
             OBJCOPY,
             f"--redefine-syms={map_file}",
-            str(original),
+            str(extracted),
             str(transformed),
         )
-        transformed.replace(original)
+        transformed_names.append(transformed.name)
 
-    # Recreate the archive and its symbol index, retaining the member order.
-    run(AR, "rcsD", str(destination), *member_names, cwd=work)
+    # Unique member names prevent collisions in the rebuilt archive.
+    run(AR, "rcsD", str(destination), *transformed_names, cwd=work)
 
 
 for library in (SDL2, MPV, OPENAL):
