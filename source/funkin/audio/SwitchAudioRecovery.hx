@@ -72,11 +72,26 @@ class SwitchAudioRecovery
       return;
     }
 
+    // A pause caused by focus loss is intentional and must not trigger recovery.
+    if (Std.isOfType(music, FunkinSound) && (cast music:FunkinSound).paused)
+    {
+      lastMusicPosition = music.time;
+      noProgressTimer = 0;
+      stallReported = false;
+      return;
+    }
+
     noProgressTimer += Math.max(0, FlxG.elapsed);
     if (noProgressTimer < AUDIO_STALL_GRACE_PERIOD || stallReported) return;
 
+    // Rebuild only this looping source. Do not tear down the shared OpenAL
+    // device from the frame loop: that path can block the Switch main thread.
     stallReported = true;
-    trace('SWITCH AUDIO: Looping menu music stopped progressing. Native device reset was skipped to keep the game responsive.');
+    final resumePosition:Float = Math.max(0.0, lastMusicPosition);
+    trace('SWITCH AUDIO: Looping menu music stalled. Recreating its source at ${resumePosition}ms.');
+    music.play(true, resumePosition);
+    lastMusicPosition = resumePosition;
+    noProgressTimer = 0;
   }
 
   static function resetMonitor():Void
