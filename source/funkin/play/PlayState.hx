@@ -2950,28 +2950,14 @@ class PlayState extends MusicBeatSubState
       audioClockStalled = switchAudioNoProgressTimer >= SWITCH_AUDIO_STALL_GRACE_PERIOD;
       if (!audioClockStalled)
       {
-        if (switchAudioClockStalled)
-        {
-          switchAudioClockStalled = false;
-
-          // If the channel's clock has resumed behind the gameplay clock, seek
-          // forward rather than allowing the Conductor and input timestamps to
-          // jump backwards. If it resumed ahead, preserve the later position.
-          final recoveredSongPosition:Float = currentPosition + Conductor.instance.combinedOffset;
-          if (recoveredSongPosition > Conductor.instance.songPosition)
-          {
-            Conductor.instance.update(recoveredSongPosition, false);
-          }
-
-          // Re-seek the music and vocal tracks to the later of the two clocks.
-          // Setting time on an active FlxSound restarts its channel at that point.
-          final targetTime:Float = Math.max(0, Math.min(music.length - 1,
-            Conductor.instance.songPosition - Conductor.instance.combinedOffset));
-          music.time = targetTime;
-          if (vocals != null) vocals.time = targetTime;
-
-          trace('SWITCH AUDIO: Playback clock resumed; synchronized it to the active gameplay clock.');
-        }
+        // Once the Switch audio clock has stalled during a song, keep the
+        // gameplay clock on the frame-based fallback until the next song/retry.
+        // Some Switch audio channels briefly report progress again before
+        // stalling a second time. Switching back to the native clock on each
+        // brief recovery makes the Conductor alternate between two clocks,
+        // which can freeze and jump note movement, animations, and input timing.
+        // Let audio recovery happen independently; never hand gameplay timing
+        // back to an intermittently advancing native audio clock mid-song.
 
         switchAudioWasPlaying = true;
         switchAudioStoppedTimer = 0;
