@@ -77,6 +77,107 @@ replace_once(
     "Lime Switch OpenAL playback clock (BYTE_OFFSET)",
 )
 
+# Use the same byte-based position when seeking. Mixing BYTE_OFFSET reads with
+# SEC_OFFSET writes leaves the source position dependent on the unreliable
+# seconds-offset query we are trying to avoid.
+replace_once(
+    lime_audio_source,
+    "\tprivate var playing:Bool;",
+    "\tprivate var playing:Bool;\n\tprivate var lastByteOffset:Int = 0;",
+    "Lime Switch OpenAL last known playback offset",
+)
+replace_once(
+    lime_audio_source,
+    "\t\t\tAL.sourcef(handle, AL.SEC_OFFSET, (value + parent.offset) / 1000.0);",
+    """\t\t\tvar bytesPerFrame = parent.buffer.channels * (parent.buffer.bitsPerSample / 8.0);
+\t\t\tif (dataLength > 0 && bytesPerFrame > 0 && parent.buffer.sampleRate > 0)
+\t\t\t{
+\t\t\t\tvar totalSeconds = (dataLength / bytesPerFrame) / parent.buffer.sampleRate;
+\t\t\t\tvar secondOffset = (value + parent.offset) / 1000.0;
+\t\t\t\tif (secondOffset < 0) secondOffset = 0;
+\t\t\t\tif (secondOffset > totalSeconds) secondOffset = totalSeconds;
+\t\t\t\tvar totalOffset = Std.int(dataLength * (secondOffset / totalSeconds));
+\t\t\t\tAL.sourcei(handle, AL.BYTE_OFFSET, totalOffset);
+\t\t\t\tlastByteOffset = totalOffset;
+\t\t\t}""",
+    "Lime Switch OpenAL byte-based seeking",
+)
+replace_once(
+    lime_audio_source,
+    """\tprivate function checkPlay(_):Void
+\t{
+\t\tif (AL.getSourcei(handle, AL.SOURCE_STATE) == AL.PLAYING)
+\t\t{
+\t\t\treturn;
+\t\t}
+
+\t\tif (loops > 0)
+\t\t{
+\t\t\tplaying = false;
+\t\t\tloops--;
+\t\t\tsetCurrentTime(0);
+\t\t\tplay();
+\t\t\treturn;
+\t\t}
+
+\t\tif (!completed)
+\t\t{
+\t\t\tstop();
+\t\t\tparent.onComplete.dispatch();
+\t\t}
+
+\t\tcompleted = true;
+\t}""",
+    """\tprivate function checkPlay(_):Void
+\t{
+\t\tif (handle == null || !playing) return;
+
+\t\tvar sourceState = AL.getSourcei(handle, AL.SOURCE_STATE);
+\t\tif (sourceState == AL.PLAYING)
+\t\t{
+\t\t\tvar byteOffset = AL.getSourcei(handle, AL.BYTE_OFFSET);
+\t\t\tif (byteOffset > lastByteOffset) lastByteOffset = byteOffset;
+\t\t\treturn;
+\t\t}
+
+\t\t// A paused source is intentional. Only recover an actually stopped source.
+\t\tif (sourceState != AL.STOPPED) return;
+
+\t\t// Switch OpenAL can stop a source before its static buffer is exhausted.
+\t\t// Resume from the last observed byte position instead of treating that
+\t\t// underrun as the end of the song.
+\t\tvar bytesPerFrame = parent.buffer.channels * (parent.buffer.bitsPerSample / 8.0);
+\t\tvar finalFrameOffset = dataLength - Std.int(bytesPerFrame);
+\t\tvar byteOffset = AL.getSourcei(handle, AL.BYTE_OFFSET);
+\t\tvar resumeOffset = byteOffset > lastByteOffset ? byteOffset : lastByteOffset;
+\t\tif (bytesPerFrame > 0 && resumeOffset < finalFrameOffset)
+\t\t{
+\t\t\tlastByteOffset = resumeOffset;
+\t\t\tAL.sourcei(handle, AL.BYTE_OFFSET, resumeOffset);
+\t\t\tAL.sourcePlay(handle);
+\t\t\treturn;
+\t\t}
+
+\t\tif (loops > 0)
+\t\t{
+\t\t\tplaying = false;
+\t\t\tloops--;
+\t\t\tsetCurrentTime(0);
+\t\t\tplay();
+\t\t\treturn;
+\t\t}
+
+\t\tif (!completed)
+\t\t{
+\t\t\tstop();
+\t\t\tparent.onComplete.dispatch();
+\t\t}
+
+\t\tcompleted = true;
+\t}""",
+    "Lime Switch OpenAL stopped-source recovery",
+)
+
 # SDL's Linux host build enables BSD string helpers in SDL_build_config.h.
 # The Lime fork's Linux linker block must explicitly link libbsd for those
 # symbols; merely installing libbsd-dev does not add it to the link command.
