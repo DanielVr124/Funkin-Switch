@@ -537,6 +537,18 @@ class Conductor
   {
     if (soundToCheck == null) soundToCheck = FlxG.sound.music;
 
+    #if switch
+    // The Switch channel can remain marked as playing while its native position
+    // query stalls. Use the same frame-interpolated Conductor clock as gameplay
+    // so note presses/releases still receive valid timestamps.
+    if (PlayState.instance != null
+      && PlayState.instance.switchAudioClockStalled
+      && soundToCheck == FlxG.sound.music)
+    {
+      return getTimeWithDelta();
+    }
+    #end
+
     @:privateAccess
     this.songPosition = soundToCheck._channel.position;
     return this.songPosition;

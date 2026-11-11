@@ -650,6 +650,12 @@ class PlayState extends MusicBeatSubState
   static final SWITCH_AUDIO_STABLE_RESET_TIME:Float = 3.0;
   static final SWITCH_AUDIO_MAX_RECOVERY_ATTEMPTS:Int = 2;
 
+  /**
+   * True when a live Switch music channel stops reporting position progress.
+   * Gameplay and note-input timing temporarily follow the frame clock instead.
+   */
+  public var switchAudioClockStalled(default, null):Bool = false;
+
   var switchAudioWasPlaying:Bool = false;
   var switchAudioStoppedTimer:Float = 0.0;
   var switchAudioStableTimer:Float = 0.0;
@@ -1269,7 +1275,17 @@ class PlayState extends MusicBeatSubState
       // The previous method where it "guessed" the song position based on the elapsed time had some flaws
       // Sometimes the songPosition would exceed the music length causing issues in other places
       // And it was frame dependent which we don't like!!
-      if (FlxG.sound.music.playing)
+      #if switch
+      if (switchAudioClockStalled)
+      {
+        // Some Switch audio channels remain alive while their reported playback
+        // position stops changing. Keep beat events, note movement and scoring
+        // on a monotonic frame clock instead of freezing gameplay at that point.
+        Conductor.instance.update(Conductor.instance.songPosition + elapsed * 1000 * playbackRate, false);
+      }
+      else
+      #end
+      if (FlxG.sound.music != null && FlxG.sound.music.playing)
       {
         final audioDiff:Float = Math.round(Math.abs(FlxG.sound.music.time - (Conductor.instance.songPosition - Conductor.instance.combinedOffset)));
         if (audioDiff <= CONDUCTOR_DRIFT_THRESHOLD)
@@ -2920,6 +2936,29 @@ class PlayState extends MusicBeatSubState
       audioClockStalled = switchAudioNoProgressTimer >= SWITCH_AUDIO_STALL_GRACE_PERIOD;
       if (!audioClockStalled)
       {
+        if (switchAudioClockStalled)
+        {
+          switchAudioClockStalled = false;
+
+          // If the channel's clock has resumed behind the gameplay clock, seek
+          // forward rather than allowing the Conductor and input timestamps to
+          // jump backwards. If it resumed ahead, preserve the later position.
+          final recoveredSongPosition:Float = currentPosition + Conductor.instance.combinedOffset;
+          if (recoveredSongPosition > Conductor.instance.songPosition)
+          {
+            Conductor.instance.update(recoveredSongPosition, false);
+          }
+          else
+          {
+            final targetTime:Float = Math.max(0, Math.min(music.length - 1,
+              Conductor.instance.songPosition - Conductor.instance.combinedOffset));
+            music.time = targetTime;
+            if (vocals != null) vocals.time = targetTime;
+          }
+
+          trace('SWITCH AUDIO: Playback clock resumed; synchronized it to the active gameplay clock.');
+        }
+
         switchAudioWasPlaying = true;
         switchAudioStoppedTimer = 0;
         switchAudioStableTimer += elapsed;
@@ -2938,18 +2977,27 @@ class PlayState extends MusicBeatSubState
     switchAudioStableTimer = 0;
     if (audioClockStalled)
     {
-      trace('SWITCH AUDIO: Instrumental channel is marked playing, but its playback clock stopped at ${switchAudioLastPosition} ms.');
-      switchAudioStoppedTimer = SWITCH_AUDIO_STOP_GRACE_PERIOD;
+      // Do not destroy a channel which still reports itself as playing. On
+      // Switch, the native channel can remain alive while its position query
+      // stalls; the frame-clock fallback keeps the chart playable in that case.
+      if (!switchAudioClockStalled)
+      {
+        switchAudioClockStalled = true;
+        trace('SWITCH AUDIO: Instrumental position stopped at ${switchAudioLastPosition} ms. Keeping the live channel and switching gameplay to the frame clock.');
+      }
+      switchAudioStoppedTimer = 0;
+      return false;
     }
-    else
-    {
-      switchAudioLastPosition = -1.0;
-      switchAudioNoProgressTimer = 0;
-      switchAudioStoppedTimer += Math.max(0, elapsed);
-    }
+
+    switchAudioLastPosition = -1.0;
+    switchAudioNoProgressTimer = 0;
+    switchAudioStoppedTimer += Math.max(0, elapsed);
 
     if (switchAudioStoppedTimer < SWITCH_AUDIO_STOP_GRACE_PERIOD) return false;
 
+    // A genuinely stopped channel also needs the gameplay clock fallback while
+    // the replacement channel is being created and verified.
+    switchAudioClockStalled = true;
     switchAudioStoppedTimer = 0;
     switchAudioLastPosition = -1.0;
     switchAudioNoProgressTimer = 0;
@@ -3001,6 +3049,7 @@ class PlayState extends MusicBeatSubState
    */
   function resetSwitchAudioRecoveryState():Void
   {
+    switchAudioClockStalled = false;
     switchAudioWasPlaying = false;
     switchAudioStoppedTimer = 0;
     switchAudioStableTimer = 0;
