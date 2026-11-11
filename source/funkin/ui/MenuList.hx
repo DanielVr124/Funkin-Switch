@@ -146,7 +146,11 @@ class MenuTypedList<T:MenuListItem> extends FlxTypedGroup<T>
       touchBuddy.setPosition(TouchUtil.touch.x, TouchUtil.touch.y);
     }
 
-    if (funkin.mobile.input.ControlsHandler.usingExternalInputDevice)
+    // Switch controls are read by Flixel's gamepad layer, but the mobile
+    // touch tracker can still report touch as the last input method. The
+    // main menu has a touch-specific navigation path, so do not let that
+    // tracker suppress the Switch controller's directional actions.
+    if (#if switch true #else funkin.mobile.input.ControlsHandler.usingExternalInputDevice #end)
     {
       if (newIndex != selectedIndex)
       {
