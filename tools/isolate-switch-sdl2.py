@@ -94,16 +94,23 @@ def transform_archive(
     for index, name in enumerate(member_names):
         occurrence = occurrences.get(name, 0) + 1
         occurrences[name] = occurrence
-        extracted = work / f"member-{index:06d}.o"
-        # Extract the Nth occurrence of this member name, avoiding lossy
-        # extraction when an archive contains repeated object basenames.
-        run(AR, "pN", str(occurrence), str(source), name, cwd=work)
-        # ar p writes to stdout; use a dedicated extraction command so binary
-        # object bytes are never decoded or routed through text.
-        with extracted.open("wb") as output:
-            subprocess.run(
-                [AR, "pN", str(occurrence), str(source), name],
-                cwd=work, stdout=output, check=True
+        # Extract one occurrence into an isolated directory. GNU ar's xN
+        # modifier selects a specific occurrence when member names repeat.
+        occurrence_dir = work / f"extract-{index:06d}"
+        occurrence_dir.mkdir()
+        result = subprocess.run(
+            [AR, "xN", str(occurrence), str(source), name],
+            cwd=occurrence_dir, text=True, capture_output=True
+        )
+        if result.returncode != 0:
+            raise SystemExit(
+                f"Could not extract occurrence {occurrence} of {name} from {source}: "
+                + result.stderr.strip()
+            )
+        extracted = occurrence_dir / name
+        if not extracted.is_file():
+            raise SystemExit(
+                f"Archive extraction did not produce expected member: {name}"
             )
 
         transformed = work / f"renamed-{index:06d}.o"
